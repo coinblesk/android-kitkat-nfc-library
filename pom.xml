@@ -3,7 +3,7 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>ch.uzh.csg</groupId>
-	<artifactId>nfclib</artifactId>
+	<artifactId>android-kitkat-nfc-library</artifactId>
 	<version>0.1.2</version>
 	<packaging>jar</packaging>
 	<name>AndroidKitKatNFCLibrary</name>
@@ -45,7 +45,7 @@
 		<dependency>
 			<groupId>android</groupId>
 			<artifactId>android</artifactId>
-			<version>4.4.2_r3</version>
+			<version>4.4.2_r4</version>
 			<scope>provided</scope>
 		</dependency>
 	</dependencies>

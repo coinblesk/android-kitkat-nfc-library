@@ -1,0 +1,15 @@
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/events/INfcEventHandler.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/NfcLibException.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/ISendLater.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/utils/Config.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/utils/Utils.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/messages/NfcMessageSplitter.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/NfcResponder.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/events/NfcEvent.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/NfcInitiator.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/transceiver/ExternalNfcTransceiver.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/transceiver/INfcTransceiver.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/HostApduServiceNfcLib.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/ITransceiveHandler.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/transceiver/InternalNfcTransceiver.java
+/home/rvoellmy/coinblesk/AndroidKitKatNFCLibrary/src/main/java/ch/uzh/csg/nfclib/messages/NfcMessage.java
