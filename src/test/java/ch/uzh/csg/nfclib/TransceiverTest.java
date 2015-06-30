@@ -1,5 +1,5 @@
 package ch.uzh.csg.nfclib;
-
+/*
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -28,12 +28,8 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import android.app.Activity;
 import android.util.Log;
-import ch.uzh.csg.nfclib.NfcInitiator.TagDiscoveredHandler;
-import ch.uzh.csg.nfclib.events.INfcEventHandler;
-import ch.uzh.csg.nfclib.events.NfcEvent;
-import ch.uzh.csg.nfclib.messages.NfcMessage;
-import ch.uzh.csg.nfclib.messages.NfcMessage.Type;
-import ch.uzh.csg.nfclib.transceiver.INfcTransceiver;
+import ch.uzh.csg.nfclib.NfcSetup.TagDiscoveredHandler;
+import ch.uzh.csg.nfclib.NfcMessage.Type;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(Log.class)
@@ -50,7 +46,7 @@ public class TransceiverTest {
 
 	private List<State> states = new ArrayList<State>();
 
-	private INfcEventHandler eventHandler1 = new INfcEventHandler() {
+	private NfcInitiatorHandler eventHandler1 = new NfcInitiatorHandler() {
 		@Override
 		public synchronized void handleMessage(NfcEvent event, Object object) {
 			State state = new State();
@@ -77,7 +73,7 @@ public class TransceiverTest {
 		}
 	};
 	
-	private INfcEventHandler eventHandler2 = new INfcEventHandler() {
+	private NfcInitiatorHandler eventHandler2 = new NfcInitiatorHandler() {
 		@Override
 		public synchronized void handleMessage(NfcEvent event, Object object) {
 			State state = new State();
@@ -139,7 +135,7 @@ public class TransceiverTest {
 		}
 	};
 
-	private class MyNfcTransceiverImpl implements INfcTransceiver {
+	private class MyNfcTransceiverImpl implements NfcTransceiver {
 
 		private boolean enabled = false;
 		private final NfcResponder customHostApduService;
@@ -245,19 +241,19 @@ public class TransceiverTest {
 		}
 	};
 
-	public NfcInitiator createTransceiver() {
+	public NfcSetup createTransceiver() {
 		return createTransceiver((byte[]) null, -1, -1, false, -1, false, -1);
 	}
 
-	public NfcInitiator createTransceiver(final byte[] payload) {
+	public NfcSetup createTransceiver(final byte[] payload) {
 		return createTransceiver(payload, -1, -1, false, -1, false, -1);
 	}
 
-	public NfcInitiator createTransceiver(final byte[] payload, int limitRequest, int limitResponse, boolean process, int timeout, final boolean sendLaterr, final int sendLaterTimeout) {
-		final NfcResponder customHostApduService = new NfcResponder(eventHandler1, new ITransceiveHandler() {
+	public NfcSetup createTransceiver(final byte[] payload, int limitRequest, int limitResponse, boolean process, int timeout, final boolean sendLaterr, final int sendLaterTimeout) {
+		final NfcResponder customHostApduService = new NfcResponder(eventHandler1, new TransceiveHandler() {
 
 	        @Override
-	        public byte[] handleMessage(byte[] message, final ISendLater sendLater) {
+	        public byte[] handleMessage(byte[] message, final SendLater sendLater) {
 	        	if(sendLaterr) {
 	        		new Thread(new Runnable() {
 						@Override
@@ -283,13 +279,13 @@ public class TransceiverTest {
 		return createTransceiver(customHostApduService, limitRequest, limitResponse, process, timeout);
 	}
 
-	public NfcInitiator createTransceiver(NfcResponder customHostApduService) {
+	public NfcSetup createTransceiver(NfcResponder customHostApduService) {
 		return createTransceiver(customHostApduService, -1, -1, false, -1);
 	}
 
-	public NfcInitiator createTransceiver(NfcResponder customHostApduService, int limitRequest, int limitResponse, boolean process, int timeout) {
+	public NfcSetup createTransceiver(NfcResponder customHostApduService, int limitRequest, int limitResponse, boolean process, int timeout) {
 		MyNfcTransceiverImpl myNfcTransceiverImpl = new MyNfcTransceiverImpl(customHostApduService, limitRequest, limitResponse, process, timeout);
-		NfcInitiator nfc = new NfcInitiator(eventHandler2, activity, userId, myNfcTransceiverImpl);
+		NfcSetup nfc = new NfcSetup(eventHandler2, activity, userId, myNfcTransceiverImpl);
 		myNfcTransceiverImpl.handler(nfc.tagDiscoveredHandler());
 		nfc.enable(null);
 		return nfc;
@@ -321,9 +317,7 @@ public class TransceiverTest {
 	
 	@After
 	public void after() {
-		/*
-		 * powermock keeps everthing in memory, with time testcase get super slow
-		 */
+		
 		Mockito.reset(activity);
 	}
 
@@ -342,7 +336,7 @@ public class TransceiverTest {
 	public void testInitNfc() throws IOException, InterruptedException {
 		reset();
 
-		NfcInitiator transceiver = createTransceiver();
+		NfcSetup transceiver = createTransceiver();
 		transceiver.initNfc();
 
 		assertEquals(2, states.size());
@@ -358,7 +352,7 @@ public class TransceiverTest {
 		NfcResponder c = mock(NfcResponder.class);
 		// return error after first message
 		when(c.processIncomingData(any(byte[].class))).thenReturn(new NfcMessage(Type.ERROR).bytes());
-		NfcInitiator transceiver = createTransceiver(c);
+		NfcSetup transceiver = createTransceiver(c);
 		transceiver.initNfc();
 
 		assertEquals(1, states.size());
@@ -369,7 +363,7 @@ public class TransceiverTest {
 	public void testTransceive_Reassembly() throws IOException, IllegalArgumentException, InterruptedException {
 		reset();
 
-		NfcInitiator transceiver = createTransceiver();
+		NfcSetup transceiver = createTransceiver();
 		transceiver.initNfc();
 
 		byte[] me = TestUtils.getRandomBytes(200);
@@ -392,7 +386,7 @@ public class TransceiverTest {
 	public void testTransceiveConsecutive() throws IOException, IllegalArgumentException, InterruptedException {
 		reset();
 
-		NfcInitiator transceiver = createTransceiver();
+		NfcSetup transceiver = createTransceiver();
 		transceiver.initNfc();
 
 		byte[] me = TestUtils.getRandomBytes(200);
@@ -426,7 +420,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1);
+		NfcSetup transceiver = createTransceiver(me1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(4000);
@@ -456,7 +450,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1);
+		NfcSetup transceiver = createTransceiver(me1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(4000);
@@ -486,7 +480,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, 19, -1, false, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, 19, -1, false, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(2);
@@ -506,7 +500,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, 19, -1, false, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, 19, -1, false, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -526,7 +520,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, -1, 19, false, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, -1, 19, false, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -545,7 +539,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, -1, 19, true, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, -1, 19, true, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -571,7 +565,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, -1, 40, true, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, -1, 40, true, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -601,7 +595,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, 42, 45, true, -1, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, 42, 45, true, -1, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -633,7 +627,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, 27, 34, true, 300, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, 27, 34, true, 300, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -650,7 +644,7 @@ public class TransceiverTest {
 		reset();
 
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, 24, 18, true, 600, false, -1);
+		NfcSetup transceiver = createTransceiver(me1, 24, 18, true, 600, false, -1);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -671,7 +665,7 @@ public class TransceiverTest {
 		reset();
 		
 		byte[] me1 = TestUtils.getRandomBytes(2000);
-		NfcInitiator transceiver = createTransceiver(me1, -1, 50, false, -1, true, 10);
+		NfcSetup transceiver = createTransceiver(me1, -1, 50, false, -1, true, 10);
 		transceiver.initNfc();
 
 		byte[] me2 = TestUtils.getRandomBytes(3000);
@@ -687,10 +681,7 @@ public class TransceiverTest {
 	
 	@Test
 	public void testTransceive_IllegalVersion_Responder() throws IOException, InterruptedException, NfcLibException, ExecutionException {
-		/*
-		 * Test when the NfcResponder returns a NfcMessage with an illegal
-		 * version
-		 */
+		
 		reset();
 
 		// the NfcMessage with the invalid sequence number
@@ -703,20 +694,18 @@ public class TransceiverTest {
 			.thenReturn(new NfcMessage(Type.AID).response().bytes())
 			.thenReturn(m2.bytes());
 		
-		NfcInitiator transceiver = createTransceiver(c);
+		NfcSetup transceiver = createTransceiver(c);
 		transceiver.initNfc();
 		
 		assertEquals(1, states.size());
 		assertEquals(NfcEvent.FATAL_ERROR, states.get(0).event);
 		assertNotNull(states.get(0).response);
-		assertEquals(NfcInitiator.INCOMPATIBLE_VERSIONS, new String(states.get(0).response));
+		assertEquals(NfcSetup.INCOMPATIBLE_VERSIONS, new String(states.get(0).response));
 	}
 	
 	@Test
 	public void testTransceive_IllegalVersion_Initiator() throws IOException, InterruptedException, NfcLibException, ExecutionException {
-		/*
-		 * Test when the NfcInitiator sends a NfcMessage with an illegal version
-		 */
+		
 		reset();
 
 		// the NfcMessage with the invalid sequence number
@@ -730,13 +719,13 @@ public class TransceiverTest {
 		assertEquals(1, states.size());
 		assertEquals(NfcEvent.FATAL_ERROR, states.get(0).event);
 		assertNotNull(states.get(0).response);
-		assertEquals(NfcInitiator.INCOMPATIBLE_VERSIONS, new String(states.get(0).response));
+		assertEquals(NfcSetup.INCOMPATIBLE_VERSIONS, new String(states.get(0).response));
 		
 		assertNotNull(response);
 		NfcMessage msg = new NfcMessage(response);
 		assertTrue(msg.isError());
 		assertNotNull(msg.payload());
-		assertEquals(NfcInitiator.INCOMPATIBLE_VERSIONS, new String((byte[]) msg.payload()));
+		assertEquals(NfcSetup.INCOMPATIBLE_VERSIONS, new String((byte[]) msg.payload()));
 	}
 	
 	@Test
@@ -746,7 +735,7 @@ public class TransceiverTest {
 		byte[] me1 = TestUtils.getRandomBytes(20);
 		final byte[] me2 = TestUtils.getRandomBytes(20);
 		
-		final NfcInitiator transceiver = createTransceiver(me1, 1000, 1000, true, -1, false, -1);
+		final NfcSetup transceiver = createTransceiver(me1, 1000, 1000, true, -1, false, -1);
 		transceiver.initNfc();
 		
 		// Start the thread before, since startPolling blocks! calling sendLater
@@ -776,3 +765,4 @@ public class TransceiverTest {
 	}
 	
 }
+*/
