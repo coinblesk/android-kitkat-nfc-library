@@ -48,7 +48,7 @@ public class NfcSetup {
 	public static final String INVALID_SEQUENCE = "Invalid sequence";
 	public static final String TIMEOUT = "Timeout";
 
-	private final NfcTransceiver transceiver;
+	private final NfcTrans transceiver;
 	
 	private final NfcInitiatorHandler initiatorHandler;
 	private final AppBroadcastReceiver broadcastReceiver;
@@ -58,7 +58,10 @@ public class NfcSetup {
 	private final NfcMessageSplitter messageSplitter = new NfcMessageSplitter();
 	private NfcMessage lastMessageSent;
 	// if the task is null, it means either we did not start or we are done.
-	private ExecutorService executorService = Executors.newSingleThreadExecutor();;
+	private ExecutorService executorService1 = Executors.newSingleThreadExecutor();
+	private ExecutorService executorService2 = Executors.newSingleThreadExecutor();
+	
+	private volatile boolean initiating = true;
 	
 	final public class AppBroadcastReceiver extends BroadcastReceiver {
 		
@@ -74,7 +77,7 @@ public class NfcSetup {
         	}
         	final byte[] responseApdu = intent.getExtras().getByteArray(HostApduServiceNfcLib.NFC_SERVICE_SEND_DATA);
         	if(responseApdu != null) {
-        		executorService.submit(new Runnable() {
+        		executorService1.submit(new Runnable() {
         			@Override
         			public void run() {
         				byte[] processed = responder.processIncomingData(responseApdu);
@@ -83,7 +86,7 @@ public class NfcSetup {
         		});
         	} else {
         		final int reason = intent.getExtras().getInt(HostApduServiceNfcLib.NFC_SERVICE_SEND_DEACTIVATE);
-        		executorService.submit(new Runnable() {
+        		executorService1.submit(new Runnable() {
         			@Override
         			public void run() {
         				responder.onDeactivated(reason);
@@ -112,13 +115,14 @@ public class NfcSetup {
 	 *            it
 	 * @param userId
 	 *            the identifier of this user (or this mobile device)
+	 * @throws NfcLibException 
 	 */
-	public NfcSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, final Activity activity) {
+	public NfcSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, final Activity activity) throws NfcLibException {
 		this.initiatorHandler = initiatorHandler;
 		if (hasClass("com.acs.smartcard.Reader") && ACSNfcTransceiver.isExternalReaderAttached(activity)) {
-			transceiver = new ACSNfcTransceiver(tagDiscoverHandler());
+			transceiver = new ACSNfcTransceiver(tagDiscoverHandler(activity), activity);
 		} else {
-			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler());
+			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler(activity), executorService2, activity);
 		}
 		
 		final NfcResponder responder = new NfcResponder(responseHandler, transceiver.maxLen());
@@ -136,16 +140,24 @@ public class NfcSetup {
 	 */
 	
 
-	protected TagDiscoverHandler tagDiscoverHandler() {
+	protected TagDiscoverHandler tagDiscoverHandler(final Activity activity) {
+		
 		return new TagDiscoverHandler() {
 			@Override
 			public void tagDiscovered(final NfcTransceiver nfcTransceiver) {
-				executorService.submit(new Runnable() {
+				executorService1.submit(new Runnable() {
+					
 					@Override
 					public void run() {
+						if (Config.DEBUG) {
+							Log.d(TAG, "Tag detected!");
+						}
 						try {
+							if(!initiating) {
+								return;
+							}
 							try {
-								handshake();
+								handshake(nfcTransceiver);
 							} catch (IOException e) {
 								initiatorHandler.handleFailed(e.toString());
 								return;
@@ -154,7 +166,7 @@ public class NfcSetup {
 							//check if we should resume
 							if(!messageQueue.isEmpty()) {
 								messageQueue.peek().resume();
-								if(!processMessage()) {
+								if(!processMessage(nfcTransceiver)) {
 									return;
 								}
 							}
@@ -173,13 +185,14 @@ public class NfcSetup {
 									messageQueue.offer(msg);
 								}
 								
-								if(!processMessage()) {
+								if(!processMessage(nfcTransceiver)) {
 									return;
 								}
 								
 							}
 							//we are complete
-							transceiver.stopInitiating();
+							initiating = false;
+							transceiver.turnOff(activity);
 							if (Config.DEBUG) {
 								Log.d(TAG, "loop done");
 							}
@@ -198,12 +211,18 @@ public class NfcSetup {
 			public void tagFailed(String message) {
 				initiatorHandler.handleFailed(message);
 			}
+
+			@Override
+			public void tagLost(NfcTransceiver nfcTransceiver) {
+				System.err.println("TG LOST");
+				
+			}
 		};
 	}
 	
-	private boolean processMessage() {
+	private boolean processMessage(NfcTransceiver transceiver) {
 		try {
-			messageLoop();
+			messageLoop(transceiver);
 		} catch (Throwable t) {
 			t.printStackTrace();
 			initiatorHandler.handleFailed(t.toString());
@@ -226,7 +245,7 @@ public class NfcSetup {
 		messageSplitter.clear();
 	}
 	
-	private void handshake() throws IOException {
+	private void handshake(NfcTransceiver transceiver) throws IOException {
 		if (Config.DEBUG) {
 			Log.d(TAG, "init NFC");
 		}
@@ -246,7 +265,7 @@ public class NfcSetup {
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
 		
-		// no sequence number here, as this is a special message
+		// no sequence number here,initiating.set( as this is a special message
 		if (Config.DEBUG) {
 			Log.d(TAG, "handshake write: "+Arrays.toString(initMessage.bytes()));
 		}
@@ -272,7 +291,7 @@ public class NfcSetup {
 		messageSplitter.maxTransceiveLength(Math.min(maxLenOther, maxLenThis));
 	}
 	
-	private void messageLoop() throws IOException {
+	private void messageLoop(NfcTransceiver transceiver) throws IOException {
 		if (Config.DEBUG) {
 			Log.d(TAG, "start message loop");
 		}
@@ -327,60 +346,38 @@ public class NfcSetup {
 			}
 		}
 	}
-
-	/**
-	 * Binds the NFC service to this activity and initializes the NFC features.
-	 * In order to fully initialize the NFC, call enableNFC(). Otherwise, no
-	 * messages will be exchanged.
-	 * 
-	 * @param activity
-	 *            the application's current activity (may not be null)
-	 */
-	public void turnOn(Activity activity) {
-		
-		try {
-			transceiver.turnOn(activity);
-		} catch (NfcLibException e) {
-			if (Config.DEBUG)
-				Log.e(TAG, "enable failed: ", e);
-		}
-	}
-
-	/**
-	 * Unbinds the NFC service from this activity and releases it for other
-	 * applications.
-	 * 
-	 * @param activity
-	 *            the application's current activity (may not be null)
-	 */
-	public void turnOff(Activity activity) {
-		
-		if (Config.DEBUG) {
-			Log.e(TAG, "turn off transceiver");
-		}
-		transceiver.turnOff(activity);
-	}
 	
 	public void shutdown(Activity activity) {
-		if (executorService != null) {
-			executorService.shutdown();
-			try {
-				executorService.awaitTermination(1, TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				if (Config.DEBUG) {
-					Log.e(TAG, "shutdown failed: ", e);
-				}
+		
+		executorService1.shutdown();
+		try {
+			executorService1.awaitTermination(1, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			if (Config.DEBUG) {
+				Log.e(TAG, "shutdown failed: ", e);
+			}
+		}
+		
+		executorService2.shutdown();
+		try {
+			executorService2.awaitTermination(1, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			if (Config.DEBUG) {
+				Log.e(TAG, "shutdown failed: ", e);
 			}
 		}
 		activity.unregisterReceiver(broadcastReceiver);
+		transceiver.shutdown();
 	}
 
 	/**
 	 * Enables the NFC so that messages can be exchanged. Attention: the
 	 * enable() method must be called first!
+	 * @throws NfcLibException 
 	 */
-	public void startInitiating() {
-		transceiver.startInitiating();
+	public void startInitiating(Activity activity) throws NfcLibException {
+		transceiver.turnOn(activity);
+		initiating = true;
 	}
 	
 	/**
@@ -392,7 +389,7 @@ public class NfcSetup {
 	 * restart the NFC capability, call enableNFC.
 	 */
 	public void stopInitiating() {
-		transceiver.stopInitiating();
+		initiating = false;
 	}
 	
 	private boolean validateSequence(final NfcMessage request, final NfcMessage response) {

@@ -128,13 +128,6 @@ public class NfcMessage {
 	public NfcMessage(Type messageType) {
 		type = messageType.ordinal();
 	}
-	
-	private NfcMessage(int type, boolean resume, int sequenceNumber, byte[] payload) {
-		this.type = type;
-		this.resume = resume;
-		this.sequenceNumber = sequenceNumber;
-		this.payload = payload;
-	}
 
 	/**
 	 * Returns the type of this message.
