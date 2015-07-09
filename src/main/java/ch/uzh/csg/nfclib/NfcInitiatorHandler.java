@@ -34,8 +34,6 @@ public interface NfcInitiatorHandler {
 	public abstract boolean hasMoreMessages();
 
 	public abstract byte[] nextMessage();
-
-	public abstract boolean isLast();
 	
 	public abstract boolean isFirst();
 

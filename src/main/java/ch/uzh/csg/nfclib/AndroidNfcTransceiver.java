@@ -1,7 +1,6 @@
 package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
 
 import android.app.Activity;
 import android.nfc.NfcAdapter;
@@ -31,7 +30,6 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	private final TagDiscoverHandler nfcInit;
 	private final NfcAdapter nfcAdapter;
 	private final Activity activity;
-	private final ExecutorService executorService;
 	
 	/*
 	 * not sure if this is called from different threads. Make it volatile just
@@ -48,13 +46,14 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	 * @param nfcInit
 	 *            the {@link TagDiscoveredHandler} which is notified as soon as
 	 *            a NFC connection is established (may not be null)
+	 * @param executorService 
 	 * @throws NfcLibException 
 	 */
-	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, ExecutorService executorService, Activity activity) throws NfcLibException {
+	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, Activity activity) throws NfcLibException {
 		this.nfcInit = nfcInit;
-		this.executorService = executorService;
 		this.activity = activity;
 		this.nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(activity);
+		//this.executorService = executorService;
 		if (nfcAdapter == null) {
 			throw new NfcLibException("NFC Adapter is null");
 		}
@@ -67,15 +66,14 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	@Override
 	public void onTagDiscovered(Tag tag) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "tag discovered: " + tag);
+			Log.d(TAG, "tag discovered:ExecutorService executorService; " + tag);
 		}
 		
 		isoDep = IsoDep.get(tag);
-		
+		 
 		try {
 			isoDep.connect();
-			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter);
-			executorService.submit(new PollTagLost(nfcInit, isoDep, transceiver));
+			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter, nfcInit);
 			nfcInit.tagDiscovered(transceiver);
 		} catch (IOException e) {
 			if (Config.DEBUG) {
@@ -86,23 +84,23 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	}
 	
 	public void shutdown() {
-		nfcAdapter.disableReaderMode(activity);
+		turnOff(activity);
 	}
 	
 	private static class AndroidTransceiver implements NfcTransceiver {
 		
 		final private IsoDep isoDep;
 		final private NfcAdapter nfcAdapter;
+		final private TagDiscoverHandler nfcInit;
 				
-		private AndroidTransceiver(IsoDep isoDep, NfcAdapter nfcAdapter) {
+		private AndroidTransceiver(IsoDep isoDep, NfcAdapter nfcAdapter, TagDiscoverHandler nfcInit) {
 			this.isoDep = isoDep;
 			this.nfcAdapter = nfcAdapter;
+			this.nfcInit = nfcInit;
 		}
 
-		
-
 		@Override
-		public byte[] write(byte[] input) throws IOException {
+		public byte[] write(byte[] input) throws IOException, NfcLibException {
 			
 			if (!nfcAdapter.isEnabled()) {
 				if (Config.DEBUG) {
@@ -117,51 +115,42 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 				}
 				throw new IOException(NFCTRANSCEIVER_NOT_CONNECTED);
 			}
+			
+			if (input == null) {
+				byte[] retVal = isoDep.transceive(new byte[1]);
+				isoDep.close();
+				return retVal;
+			}
 
 			if (input.length > isoDep.getMaxTransceiveLength()) {
 				throw new IOException("This message length exceeds the maximum capacity of " + isoDep.getMaxTransceiveLength() + " bytes.");
 			} else if (input.length > MAX_WRITE_LENGTH) {
 				throw new IOException("The message length exceeds the maximum capacity of " + MAX_WRITE_LENGTH + " bytes.");
 			}
+			try {
+				byte[] retVal = isoDep.transceive(input);
+				return retVal;
+			} catch (IOException e) {
+				nfcInit.tagLost(this);
+				isoDep.close();
+				throw new NfcLibException("connection seems to be lost: ", e);
+			}
 			
-			return isoDep.transceive(input);
 		}
 
 		@Override
 		public int maxLen() {
 			return MAX_WRITE_LENGTH;
 		}
-	}
-	
-	private static class PollTagLost implements Runnable {
-		
-		final private TagDiscoverHandler nfcInit;
-		final private IsoDep isoDep;
-		final private NfcTransceiver nfcTransceiver;
-		
-		private PollTagLost(TagDiscoverHandler nfcInit, IsoDep isoDep, NfcTransceiver nfcTransceiver) {
-			this.nfcInit = nfcInit;
-			this.isoDep = isoDep;
-			this.nfcTransceiver = nfcTransceiver;
-		}
-		public void run() {
-			try {
-				while(isoDep.isConnected()) {
-					Thread.sleep(50);
-				}
-			} catch (Throwable t) {
-				if (Config.DEBUG) {
-					Log.e(TAG, "Could not connnect isodep1: ", t);
-				}
-			}
+
+		@Override
+		public void close() {
 			try {
 				isoDep.close();
-			} catch (Throwable t) {
-				if (Config.DEBUG) {
-					Log.e(TAG, "Could not connnect isodep2: ", t);
-				}
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
-			nfcInit.tagLost(nfcTransceiver);
+			
 		}
 	}
 
@@ -172,6 +161,11 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 
 	@Override
 	public void turnOn(Activity activity) throws NfcLibException {
+		
+		if (Config.DEBUG) {
+			Log.d(TAG, "turn on device");
+		}
+		
 		/*
 		 * Based on the reported issue in
 		 * https://code.google.com/p/android/issues/detail?id=58773, there is a
@@ -181,23 +175,34 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		 * time can be changed with the EXTRA_READER_PRESENCE_CHECK_DELAY
 		 * option.
 		 */
-		Bundle options = new Bundle();
-		//this causes a huge delay for a second reconnect! don't use this!
-		options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 0);
+		//Bundle options = new Bundle();
+		//this causes a huge delay for a second reconnect! don't use this! -> setting this to 0 crashes the Oneplus One
+		//options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 0);
 
-		nfcAdapter.enableReaderMode(activity, this, NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK, options);
+		nfcAdapter.enableReaderMode(activity, 
+				this, NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK, Bundle.EMPTY);
+		
+		if (!nfcAdapter.isEnabled()) {
+			if (Config.DEBUG) {
+				Log.d(TAG, "could not turn on NFC, nfcAdapter is not enabled");
+			}
+			throw new NfcLibException("could not turn on NFC, nfcAdapter is not enabled");
+		}
 	}
 
 	@Override
 	public void turnOff(Activity activity) {
+		if (Config.DEBUG) {
+			Log.d(TAG, "turn off device");
+		}
 		try {
 			isoDep.close();
-		} catch (IOException e) {
+		} catch (Throwable e) {
 			if (Config.DEBUG) {
 				Log.d(TAG, "could not close isodep", e);
 			}
 		}
 		nfcAdapter.disableReaderMode(activity);
-		
 	}
+	
 }

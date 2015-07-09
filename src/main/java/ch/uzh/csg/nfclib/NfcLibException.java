@@ -1,5 +1,6 @@
 package ch.uzh.csg.nfclib;
 
+
 /**
  * This exception is thrown, when a fatal NFC error occurs (e.g., NFC is not
  * enabled).
@@ -14,6 +15,10 @@ public class NfcLibException extends Exception {
 
 	public NfcLibException(String msg) {
 		super(msg);
+	}
+
+	public NfcLibException(String msg, Exception e) {
+		super(msg, e);
 	}
 
 }

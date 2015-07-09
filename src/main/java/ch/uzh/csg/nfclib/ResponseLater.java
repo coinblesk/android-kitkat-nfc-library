@@ -8,6 +8,4 @@ package ch.uzh.csg.nfclib;
  */
 public interface ResponseLater {
 	public void response(byte[] data);
-	
-	public void reset();
 }

@@ -207,6 +207,12 @@ public class ACSNfcTransceiver implements NfcTrans {
 		public int maxLen() {
 			return MAX_WRITE_LENGTH;
 		}
+
+		@Override
+		public void close() {
+			System.err.println("do nothing");
+			
+		}
 	}
 	
 	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit) {

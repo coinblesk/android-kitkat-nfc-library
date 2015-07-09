@@ -29,11 +29,12 @@ public interface NfcTransceiver {
 	 * @throws IOException
 	 *             if there is an I/O error
 	 */
-	public byte[] write(byte[] input) throws IOException;
+	public byte[] write(byte[] input) throws IOException, NfcLibException;
 
 	/**
 	 * Returns the maximum transceive (send/receive) length.
 	 */
 	public int maxLen();
 
+	public void close();
 }

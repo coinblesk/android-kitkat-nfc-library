@@ -76,7 +76,7 @@ public class NfcResponder {
 			maxLen = Math.min(Integer.MAX_VALUE, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.AID_RESPONSE).payload(intVal).bytes();
+			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
 		case AID_2:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID2 selected");
@@ -84,7 +84,7 @@ public class NfcResponder {
 			maxLen = Math.min(53, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.AID_RESPONSE).payload(intVal).bytes();
+			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
 		case AID_3:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID3 selected");
@@ -92,12 +92,13 @@ public class NfcResponder {
 			maxLen = Math.min(245, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.AID_RESPONSE).payload(intVal).bytes();
-		case FIRST:
-			reset();
+			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
 		default:
 			if (Config.DEBUG) {
-				Log.d(TAG, "process regular message");
+				Log.d(TAG, "process regular message " + inputMessage);
+			}
+			if(inputMessage.type() == Type.SINGLE_FIRST || inputMessage.type()==Type.FIRST) {
+				reset();
 			}
 			
 			final boolean check = inputMessage.check(lastMessageReceived);
@@ -108,7 +109,7 @@ public class NfcResponder {
 			if (!check && !repeat) {
 				if (Config.DEBUG) {
 					Log.e(TAG, "sequence number mismatch " + inputMessage.sequenceNumber() + 
-							" / " + (lastMessageReceived == null ? 0 : lastMessageReceived.sequenceNumber()));
+							" / " + (lastMessageReceived == null ? -1 : lastMessageReceived.sequenceNumber()));
 				}
 				
 				responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
@@ -119,8 +120,8 @@ public class NfcResponder {
 				lastMessageReceived = inputMessage;
 				return lastMessageSent.bytes();
 			}
-			lastMessageReceived = inputMessage;
 			outputMessage = handleRequest(inputMessage);
+			lastMessageReceived = inputMessage;
 			return prepareWrite(outputMessage);
 		}
 		
@@ -136,10 +137,6 @@ public class NfcResponder {
 	
 	private byte[] prepareWrite(NfcMessage outputMessage) {
 		lastMessageSent = outputMessage.sequenceNumber(lastMessageSent);
-		
-		if(outputMessage.isLast()) {
-			reset();
-		}
 		
 		byte[] retVal = outputMessage.bytes();
 		
@@ -171,11 +168,35 @@ public class NfcResponder {
 			responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
 			return null;
 		}
-		//final boolean hasMoreFragments = incoming.isFragment();
 
 		switch (incoming.type()) {
+		
+		case SINGLE:
+			return response(incoming.payload(), false);
+		case SINGLE_FIRST:
+			return response(incoming.payload(), true);
+		case FIRST:
 		case FRAGMENT:
-			if(incoming.isGetNextFragment()) {
+		case FRAGMENT_LAST:
+			if(incoming.payload().length > 0) {
+				switch (incoming.type()) {
+					case FIRST:
+						reset(); //this is the very first message, clean all states
+						messageSplitter.reassemble(incoming);
+						return new NfcMessage(Type.FRAGMENT);
+					case FRAGMENT:
+						messageSplitter.reassemble(incoming);
+						return new NfcMessage(Type.FRAGMENT);
+					case FRAGMENT_LAST:
+						messageSplitter.reassemble(incoming);
+						final byte[] receivedData = messageSplitter.data();
+						messageSplitter.clear();
+						return response(receivedData, incoming.isFirst());
+					default:
+						return new NfcMessage(Type.ERROR);
+				}
+			} else if (incoming.type() == Type.FRAGMENT){
+				//continue with our message queue
 				if (messageQueue.isEmpty()) {
 					if (Config.DEBUG) {
 						Log.e(TAG, "nothing to return (get next fragment)");
@@ -185,37 +206,10 @@ public class NfcResponder {
 				}
 				return messageQueue.poll();
 			} else {
-				messageSplitter.reassemble(incoming);
-				return new NfcMessage(Type.FRAGMENT);
-			}
-		case DONE:
-		case LAST:
-		case FIRST:
-			messageSplitter.reassemble(incoming);
-			final byte[] receivedData = messageSplitter.data();
-			messageSplitter.clear();
-
-			final byte[] response = responseHandler.handleMessageReceived(receivedData, new ResponseLater(){
-				@Override
-				public void response(byte[] data) {
-					synchronized (lock) {
-						lateMessage = fragmentData(data, incoming.isFirst(), incoming.isLast());
-					}
+				if (Config.DEBUG) {
+					Log.e(TAG, "unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);
 				}
-
-				@Override
-				public void reset() {
-					
-				}});
-			
-			
-
-			// the user can decide to use sendLater. In that case, we'll start
-			// to poll. This is triggered by returning null.
-			if (response == null) {
-				return new NfcMessage(NfcMessage.Type.POLLING);
-			} else {
-				return fragmentData(response, incoming.isFirst(), incoming.isLast());
+				return new NfcMessage(Type.ERROR);
 			}
 		case POLLING:
 			NfcMessage msg = checkForData();
@@ -225,24 +219,47 @@ public class NfcResponder {
 				return new NfcMessage(Type.POLLING);
 			}
 		default:
+			if (Config.DEBUG) {
+				Log.e(TAG, "unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
+			}
 			return new NfcMessage(Type.ERROR);
 		}
 	}
 
-	private NfcMessage fragmentData(byte[] response, boolean first, boolean last) {
+	private NfcMessage response(final byte[] payload, final boolean first) {
+		final byte[] response = responseHandler.handleMessageReceived(payload, new ResponseLater(){
+			@Override
+			public void response(byte[] data) {
+				synchronized (lock) {
+					lateMessage = fragmentData(data, first);
+				}
+			}});
+		
+		// the user can decide to use sendLater. In that case, we'll start
+		// to poll. This is triggered by returning null.
+		if (response == null) {
+			return new NfcMessage(NfcMessage.Type.POLLING);
+		} else {
+			return fragmentData(response, false);
+		}
+	}
+
+	private NfcMessage fragmentData(byte[] response, boolean first) {
 		if (response == null) {
 			return null;
 		}
-		for (NfcMessage msg : messageSplitter.getFragments(response, first, last)) {
+		for (NfcMessage msg : messageSplitter.getFragments(response, first)) {
 			messageQueue.offer(msg);
 		}
 
-		if (Config.DEBUG)
+		if (Config.DEBUG) {
 			Log.d(TAG, "returning: " + response.length + " bytes, " + messageQueue.size() + " fragments");
+		}
 		
 		if (messageQueue.isEmpty()) {
-			if (Config.DEBUG)
+			if (Config.DEBUG) {
 				Log.e(TAG, "nothing to return - message queue is empty");
+			}
 			
 			responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
 		}
