@@ -68,7 +68,7 @@ public class NfcMessageTest {
 		byte[] intVal = Utils.intToByteArray(1);
 		NfcMessage m1 = new NfcMessage(Type.SINGLE).payload(intVal);
 		byte[] transfer = m1.bytes();
-		byte[] expected = new byte[]{5,0,0,0,1};
+		byte[] expected = new byte[]{4,0,0,0,1};
 		Assert.assertArrayEquals(expected, transfer);
 	}
 	

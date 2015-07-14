@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
@@ -41,7 +38,6 @@ import ch.uzh.csg.nfclib.NfcMessage.Type;
 public class NfcSetup {
 	private static final String TAG = "ch.uzh.csg.nfclib.NfcSetup";
 	
-	public static final int CONNECTION_TIMEOUT = 500;
 	public static final String NULL_ARGUMENT = "The message is null";
 	public static final String NFCTRANSCEIVER_NOT_CONNECTED = "Could not write message, NfcTransceiver is not connected.";
 	public static final String UNEXPECTED_ERROR = "An error occured while transceiving the message.";
@@ -57,8 +53,6 @@ public class NfcSetup {
 	private final Deque<NfcMessage> messageQueue = new ConcurrentLinkedDeque<NfcMessage>();
 	private final NfcMessageSplitter messageSplitter = new NfcMessageSplitter();
 	private NfcMessage lastMessageSent;
-	// if the task is null, it means either we did not start or we are done.
-	private ExecutorService executorService1 = Executors.newSingleThreadExecutor();
 	
 	private volatile boolean initiating = true;
 	
@@ -76,21 +70,11 @@ public class NfcSetup {
         	}
         	final byte[] responseApdu = intent.getExtras().getByteArray(HostApduServiceNfcLib.NFC_SERVICE_SEND_DATA);
         	if(responseApdu != null) {
-        		executorService1.submit(new Runnable() {
-        			@Override
-        			public void run() {
-        				byte[] processed = responder.processIncomingData(responseApdu);
-        				sendBroadcast(context, processed);
-        			}
-        		});
+        		byte[] processed = responder.processIncomingData(responseApdu);
+        		sendBroadcast(context, processed);
         	} else {
         		final int reason = intent.getExtras().getInt(HostApduServiceNfcLib.NFC_SERVICE_SEND_DEACTIVATE);
-        		executorService1.submit(new Runnable() {
-        			@Override
-        			public void run() {
-        				responder.onDeactivated(reason);
-        			}
-        		});
+        		responder.onDeactivated(reason);
         	}
         	
         }
@@ -405,16 +389,6 @@ public class NfcSetup {
 	}
 	
 	public void shutdown(Activity activity) {
-		
-		executorService1.shutdown();
-		try {
-			executorService1.awaitTermination(1, TimeUnit.SECONDS);
-		} catch (InterruptedException e) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "shutdown failed: ", e);
-			}
-		}
-		
 		activity.unregisterReceiver(broadcastReceiver);
 	}
 
