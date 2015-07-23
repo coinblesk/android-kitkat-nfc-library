@@ -9,6 +9,13 @@ import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.util.Log;
+import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcEvent;
+import ch.uzh.csg.comm.NfcInitiatorHandler;
+import ch.uzh.csg.comm.NfcLibException;
+import ch.uzh.csg.comm.NfcTransceiver;
+import ch.uzh.csg.comm.ReplyCallback;
+import ch.uzh.csg.comm.TagDiscoverHandler;
 
 /**
  * This class handles the initialization and the message exchange over NFC for
@@ -100,7 +107,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		}
 
 		@Override
-		public byte[] write(byte[] input) throws IOException, NfcLibException {
+		public byte[] write(byte[] input) throws Exception {
 			
 			if (!nfcAdapter.isEnabled()) {
 				if (Config.DEBUG) {
@@ -114,12 +121,6 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 					Log.d(TAG, "could not write message, isodep is not or no longer connected");
 				}
 				throw new IOException(NFCTRANSCEIVER_NOT_CONNECTED);
-			}
-			
-			if (input == null) {
-				byte[] retVal = isoDep.transceive(new byte[1]);
-				isoDep.close();
-				return retVal;
 			}
 
 			if (input.length > isoDep.getMaxTransceiveLength()) {

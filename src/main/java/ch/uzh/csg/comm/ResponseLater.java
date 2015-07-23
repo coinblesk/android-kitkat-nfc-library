@@ -1,4 +1,4 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 /**
  * Send response at a later stage, in the meantime, start polling

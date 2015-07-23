@@ -1,4 +1,4 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 /**
  * This class contains settings for the nfc library.

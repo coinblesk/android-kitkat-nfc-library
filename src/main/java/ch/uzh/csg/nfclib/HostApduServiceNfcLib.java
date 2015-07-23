@@ -9,6 +9,7 @@ import android.content.IntentFilter;
 import android.nfc.cardemulation.HostApduService;
 import android.os.Bundle;
 import android.util.Log;
+import ch.uzh.csg.comm.Config;
 
 /**
  * This class handles incoming messages over NFC, which are passed to this

@@ -11,6 +11,13 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.util.Log;
+import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcEvent;
+import ch.uzh.csg.comm.NfcInitiatorHandler;
+import ch.uzh.csg.comm.NfcLibException;
+import ch.uzh.csg.comm.NfcTransceiver;
+import ch.uzh.csg.comm.ReplyCallback;
+import ch.uzh.csg.comm.TagDiscoverHandler;
 
 import com.acs.smartcard.Reader;
 import com.acs.smartcard.Reader.OnStateChangeListener;
@@ -168,7 +175,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 		
 
 		@Override
-		public byte[] write(byte[] input) throws IOException {
+		public byte[] write(byte[] input) throws Exception {
 			if (!reader.isOpened()) {
 				if (Config.DEBUG) {
 					Log.d(TAG, "could not write message, reader is not or no longe open");

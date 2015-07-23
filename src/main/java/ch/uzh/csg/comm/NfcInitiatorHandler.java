@@ -1,6 +1,4 @@
-package ch.uzh.csg.nfclib;
-
-
+package ch.uzh.csg.comm;
 
 /**
  * The implementation of this interface must implement what has to be done on
@@ -21,7 +19,7 @@ public interface NfcInitiatorHandler {
 	 * @param object
 	 *            additional data or null
 	 */
-	public abstract void handleMessageReceived(byte[] message);
+	public abstract void handleMessageReceived(byte[] message) throws Exception;
 	
 	public abstract void handleFailed(String message);
 	
@@ -33,7 +31,7 @@ public interface NfcInitiatorHandler {
 
 	public abstract boolean hasMoreMessages();
 
-	public abstract byte[] nextMessage();
+	public abstract byte[] nextMessage() throws Exception;
 	
 	public abstract boolean isFirst();
 

@@ -1,4 +1,4 @@
-/home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/messages/NfcMessageTest.java
+/home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/NfcMessageTest.java
+/home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/NfcMessageSplitterTest.java
 /home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/TransceiverTest.java
 /home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/TestUtils.java
-/home/draft/git/android-kitkat-nfc-library2/src/test/java/ch/uzh/csg/nfclib/messages/NfcMessageSplitterTest.java

@@ -1,9 +1,17 @@
 package ch.uzh.csg.btlib;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -31,15 +39,27 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
 import android.widget.Toast;
+import ch.uzh.csg.comm.CommSetup;
+import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcInitiatorHandler;
+import ch.uzh.csg.comm.NfcLibException;
+import ch.uzh.csg.comm.NfcMessage;
+import ch.uzh.csg.comm.NfcMessage.Type;
+import ch.uzh.csg.comm.NfcMessageSplitter;
+import ch.uzh.csg.comm.NfcResponder;
+import ch.uzh.csg.comm.NfcResponseHandler;
+import ch.uzh.csg.comm.NfcTransceiver;
+import ch.uzh.csg.comm.ReplyCallback;
+import ch.uzh.csg.nfclib.NfcSetup;
 
-public class BTSetup {
+public class BTSetup implements CommSetup {
 	
 	final private static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	final private static AdvertiseData ADVERTISE_DATA = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(COINBLESK_SERVICE_UUID)).build();
 	final private static AdvertiseSettings ADVERTISE_SETTINGS = new AdvertiseSettings.Builder()
 		.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
 		.setConnectable(true)
-		.setTimeout(180000)
+		.setTimeout(180 * 1000)
 		.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH).build();
 	final private static AdvertiseCallback ADVERTISE_CALLBACK = new AdvertiseCallback() {
 		@Override
@@ -54,12 +74,23 @@ public class BTSetup {
 	final private BluetoothManager bluetoothManager;
 	final private BluetoothAdapter bluetoothAdapter;
 	
-	final public boolean DEBUG = true;
+	
+	
+	private final NfcInitiatorHandler initiatorHandler;
+	private final NfcResponder responder;
+	
+	//state
+	private final NfcMessageSplitter messageSplitter = new NfcMessageSplitter();
+	private final Deque<NfcMessage> messageQueue = new ConcurrentLinkedDeque<NfcMessage>();
+	private NfcMessage lastMessageSent;
 	
 	// Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 1000000;
 	
-	public BTSetup(Activity activity) {
+	public BTSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, Activity activity) {
+		messageSplitter.maxTransceiveLength(20);
+		this.initiatorHandler = initiatorHandler;
+		this.responder = new NfcResponder(responseHandler, 20);
 		// Use this check to determine whether BLE is supported on the device. Then
 		// you can selectively disable BLE-related features.
 		if (!activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
@@ -80,35 +111,38 @@ public class BTSetup {
 		}
 		server = bluetoothManager.openGattServer(activity, new BluetoothGattServerCallback() {
 			
+			byte[] response = null;
+			
 			@Override
-			public void onCharacteristicWriteRequest(BluetoothDevice device,
-					int requestId, BluetoothGattCharacteristic characteristic,
+			public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset,
+					BluetoothGattCharacteristic characteristic) {
+				if(Config.DEBUG) {
+					Log.d(TAG, "got request read");
+				}
+				System.err.println("send back1: "+Arrays.toString(response));
+				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
+			}
+			
+			@Override
+			public void onCharacteristicWriteRequest(final BluetoothDevice device,
+					final int requestId, BluetoothGattCharacteristic characteristic,
 					boolean preparedWrite, boolean responseNeeded, int offset,
 					byte[] value) {
-				System.err.println("got desc request!");
-				if(DEBUG) {
-					Log.d(TAG, "got request: "+Arrays.toString(value));
+				if(Config.DEBUG) {
+					Log.d(TAG, "got request write: "+Arrays.toString(value));
 				}
 				
-				final byte[] reply = new byte[20];
-				if(DEBUG) {
-					Log.d(TAG, "reply with: "+Arrays.toString(reply));
-				}
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, reply);
+				response = responder.processIncomingData(value);
+				System.err.println("send back2: "+Arrays.toString(response));
+				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
 			}
+			
 			
 			@Override
 			public void onConnectionStateChange(BluetoothDevice device,
 					int status, int newState) {
-				if(DEBUG) {
+				if(Config.DEBUG) {
 					Log.d(TAG, "connected: "+newState+ " / " + BluetoothGatt.STATE_CONNECTED);
-				}
-			}
-			
-			@Override
-			public void onServiceAdded(int status, BluetoothGattService service) {
-				if(DEBUG) {
-					Log.d(TAG, "service added: "+service);
 				}
 			}
 		});
@@ -120,9 +154,137 @@ public class BTSetup {
 	    service.addCharacteristic(characteristic);
 		server.addService(service);
 		mHandler = new Handler();
+		advertise();
 		
+	}
+	
+	private void btleDiscovered(NfcTransceiver nfcTransceiver) throws Exception {
+		initiatorHandler.handleStatus("handshake complete");
+		// check if we should resume
+		if (!messageQueue.isEmpty()) {
+			messageQueue.peek().resume();
+			if (!processMessage(nfcTransceiver)) {
+				System.err.println("return false1");
+				return;
+			}
+		}
+		// get the complete message
+		while (initiatorHandler.hasMoreMessages()) {
+			boolean first = initiatorHandler.isFirst();
+			byte[] message = initiatorHandler.nextMessage();
+			if (message == null) {
+				initiatorHandler.handleFailed("noting to do");
+				return;
+			}
+
+			// split it
+			for (NfcMessage msg : messageSplitter.getFragments(
+					message, first)) {
+				messageQueue.offer(msg);
+			}
+
+			if (!processMessage(nfcTransceiver)) {
+				System.err.println("return false2");
+				return;
+			}
+
+		}
+		System.err.println("we are out");
+	}
+	
+	private boolean processMessage(NfcTransceiver transceiver) {
+		try {
+			messageLoop(transceiver);
+		} catch (Throwable t) {
+			t.printStackTrace();
+			initiatorHandler.handleFailed(t.toString());
+			return false;
+		}
+		messageSplitter.clear();
+		return true;
+	}
+	
+	private void messageLoop(final NfcTransceiver transceiver) throws Exception {
+		if (Config.DEBUG) {
+			Log.d(TAG, "start message loop");
+		}
+		while (!messageQueue.isEmpty()) {
+			final NfcMessage request = messageQueue.peek();
+			request.sequenceNumber(lastMessageSent);
+			
+			if (Config.DEBUG) {
+				Log.d(TAG, "loop write: "+request+ " / "+Arrays.toString(request.bytes()));
+			}
+			byte[] response = transceiver.write(request.bytes());
+			
+			if (response == null) {
+				throw new IOException(NfcSetup.UNEXPECTED_ERROR);
+			}
+			NfcMessage responseMessage = new NfcMessage(response);
+			if (Config.DEBUG) {
+				Log.d(TAG, "loop response: "+responseMessage);
+			}
+				
+			//message successfully sent, remove from queue
+			messageQueue.poll();
+			initiatorHandler.handleStatus("message fragment sent, queue: "+messageQueue.size());
+				
+			
+			if (!NfcSetup.validateSequence(request, responseMessage)) {
+				if (Config.DEBUG) {
+					Log.e(TAG, "sequence error " + request + " / " + response);
+				}
+				throw new IOException(NfcSetup.INVALID_SEQUENCE);
+			}
+				
+			lastMessageSent = request;
+				
+			switch (responseMessage.type()) {
+			case SINGLE:
+			case SINGLE_FIRST:
+			case FRAGMENT:
+			case FRAGMENT_LAST:
+				if(responseMessage.payload().length > 0) {
+					//we receive fragments
+					switch (responseMessage.type()) {
+					case SINGLE:
+					case SINGLE_FIRST:
+						initiatorHandler.handleMessageReceived(responseMessage.payload());
+						break;
+					case FRAGMENT:
+						messageSplitter.reassemble(responseMessage);
+						messageQueue.offer(new NfcMessage(Type.FRAGMENT));
+						break;
+					case FRAGMENT_LAST:
+						messageSplitter.reassemble(responseMessage);
+						initiatorHandler.handleMessageReceived(messageSplitter.data());
+						break;
+					default:
+						throw new RuntimeException("This can never happen");
+					}
+				} else {
+					//we send fragments
+					if(messageQueue.isEmpty()) {
+						throw new IOException("message queue empty, cannot send fragments");
+					}
+				}
+				break;
+			case POLLING:
+				messageQueue.offer(new NfcMessage(Type.POLLING));
+				break;
+			case ERROR:
+				throw new IOException("the message "+request+" caused an exception on the other side");
+			default:
+				throw new IOException("did not expect the type "+responseMessage.type()+" as reply");
+			}
+		}
+		
+	}
+	
+	public void advertise() {
 		startLeAdvertising(bluetoothAdapter);
 	}
+
 	
 	private static boolean startLeAdvertising(BluetoothAdapter bluetoothAdapter) {
 		BluetoothLeAdvertiser advertiser = bluetoothAdapter
@@ -130,7 +292,7 @@ public class BTSetup {
 		if (advertiser == null) {
 			return false;
 		}
-
+		System.err.println("start adv");
 		advertiser.startAdvertising(ADVERTISE_SETTINGS, ADVERTISE_DATA, ADVERTISE_CALLBACK);
 		return true;
 	}
@@ -155,6 +317,10 @@ public class BTSetup {
 		server.connect(device, false);
 		BluetoothGatt bluetoothGatt = device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
+			
+			
+			BlockingQueue<byte[]> msg = new SynchronousQueue<>();
+			
 			@Override
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
 					int newState) {
@@ -164,17 +330,50 @@ public class BTSetup {
 			}
 			
 			@Override
-			public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+			public void onServicesDiscovered(final BluetoothGatt gatt, int status) {
 				System.err.println("device discovered");
 				if (status == BluetoothGatt.GATT_SUCCESS) {
 					System.err.println("service: " + gatt.getServices());
-					BluetoothGattService ser = gatt.getService(UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8"));
-					BluetoothGattCharacteristic car = ser.getCharacteristic(UUID.fromString("42cf539b-814f-4360-875a-ad4c882285f5"));
-					car.setValue(new byte[20]);
+					final BluetoothGattService ser = gatt.getService(UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8"));
+					final BluetoothGattCharacteristic car = ser.getCharacteristic(UUID.fromString("42cf539b-814f-4360-875a-ad4c882285f5"));
+					
+					//car.setValue(NfcMessage.BTLE_INIT);
+					new Thread(new Runnable() {
+						
+						@Override
+						public void run() {
+							try {
+							btleDiscovered(new NfcTransceiver() {
+								
+								@Override
+								public byte[] write(byte[] input) throws Exception {
+									car.setValue(input);
+									gatt.writeCharacteristic(car);
+									return msg.poll(10, TimeUnit.SECONDS);
+								}
+								
+								@Override
+								public int maxLen() {
+									return 20;
+								}
+								
+								@Override
+								public void close() {
+									gatt.close();
+								}
+							});
+							} catch (Exception e) {
+								initiatorHandler.handleFailed(e.toString());
+							}
+							
+						}
+					}).start();
+					
+					
 					System.err.println("service: " + gatt.getServices());
-					boolean write = gatt.writeCharacteristic(car);
+					//boolean write = gatt.writeCharacteristic(car);
 
-					System.err.println("connected!!! "+status + "/");
+					//System.err.println("connected!!! "+status + "/" + write);
 				}			       
 			}
 			
@@ -182,7 +381,22 @@ public class BTSetup {
 			public void onCharacteristicWrite(BluetoothGatt gatt,
 					BluetoothGattCharacteristic characteristic, int status) {
 				System.err.println("here3 "+characteristic.getValue().length);
+				final BluetoothGattService ser = gatt.getService(UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8"));
+				final BluetoothGattCharacteristic car = ser.getCharacteristic(UUID.fromString("42cf539b-814f-4360-875a-ad4c882285f5"));
+				gatt.readCharacteristic(car);
+				//byte[] next = responder.processIncomingData(characteristic.getValue());
+				//BluetoothGattService ser = gatt.getService(UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8"));
+				//BluetoothGattCharacteristic car = ser.getCharacteristic(UUID.fromString("42cf539b-814f-4360-875a-ad4c882285f5"));
+				//car.setValue(next);
+				//gatt.writeCharacteristic(car);
 			}
+			@Override
+			public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
+					int status) {
+				System.err.println("here4 "+characteristic.getValue().length);
+				msg.offer(characteristic.getValue());
+			}
+
 			
 		});
 		
@@ -228,9 +442,22 @@ public class BTSetup {
 						ScanSettings.SCAN_MODE_LOW_LATENCY).build(), scb);
 
 	}
-	
-    public void shutdownServer() {
+
+	@Override
+	public void stopInitiating(Activity test) {
+				
+	}
+
+	@Override
+	public void shutdown(Activity test) {
 		server.close();
-    }
+	}
+
+	@Override
+	public void startInitiating(Activity test) throws NfcLibException {
+		System.err.println("start scanning");
+		scanLeDevice(test);
+		
+	}
 	
 }

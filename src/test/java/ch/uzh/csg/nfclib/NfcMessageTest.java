@@ -4,8 +4,9 @@ package ch.uzh.csg.nfclib;
 import org.junit.Assert;
 import org.junit.Test;
 
-import ch.uzh.csg.nfclib.NfcMessage;
-import ch.uzh.csg.nfclib.NfcMessage.Type;
+import ch.uzh.csg.comm.NfcMessage;
+import ch.uzh.csg.comm.Utils;
+import ch.uzh.csg.comm.NfcMessage.Type;
 
 public class NfcMessageTest {
 	

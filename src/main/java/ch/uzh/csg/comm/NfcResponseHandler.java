@@ -1,6 +1,4 @@
-package ch.uzh.csg.nfclib;
-
-
+package ch.uzh.csg.comm;
 
 /**
  * The implementation of this interface must implement what has to be done on
@@ -23,7 +21,7 @@ public interface NfcResponseHandler {
 	 *            additional data or null
 	 * @return 
 	 */
-	public abstract byte[] handleMessageReceived(byte[] message, ResponseLater responseLater);
+	public abstract byte[] handleMessageReceived(byte[] message, ResponseLater responseLater) throws Exception;
 	
 	public abstract void handleFailed(String message);
 	

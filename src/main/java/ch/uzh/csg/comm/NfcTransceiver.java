@@ -1,4 +1,4 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 import java.io.IOException;
 
@@ -29,7 +29,7 @@ public interface NfcTransceiver {
 	 * @throws IOException
 	 *             if there is an I/O error
 	 */
-	public byte[] write(byte[] input) throws IOException, NfcLibException;
+	public byte[] write(byte[] input) throws Exception;
 
 	/**
 	 * Returns the maximum transceive (send/receive) length.

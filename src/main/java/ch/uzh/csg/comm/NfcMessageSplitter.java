@@ -1,9 +1,9 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import ch.uzh.csg.nfclib.NfcMessage.Type;
+import ch.uzh.csg.comm.NfcMessage.Type;
 
 
 /**
@@ -56,6 +56,7 @@ public class NfcMessageSplitter {
 		 * into (taking into account protocol headers etc.).
 		 */
 		final int fragments = (len + payloadLength - 1) / payloadLength;
+		System.err.println("len: "+len+" payloadlen: "+payloadLength);
 		final ArrayList<NfcMessage> list = new ArrayList<NfcMessage>(fragments);
 		
 		if(fragments == 1) {

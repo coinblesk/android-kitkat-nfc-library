@@ -11,7 +11,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.util.Log;
-import ch.uzh.csg.nfclib.NfcMessage.Type;
+import ch.uzh.csg.comm.CommSetup;
+import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcEvent;
+import ch.uzh.csg.comm.NfcInitiatorHandler;
+import ch.uzh.csg.comm.NfcLibException;
+import ch.uzh.csg.comm.NfcMessage;
+import ch.uzh.csg.comm.NfcMessageSplitter;
+import ch.uzh.csg.comm.NfcResponder;
+import ch.uzh.csg.comm.NfcResponseHandler;
+import ch.uzh.csg.comm.NfcTransceiver;
+import ch.uzh.csg.comm.TagDiscoverHandler;
+import ch.uzh.csg.comm.Utils;
+import ch.uzh.csg.comm.NfcMessage.Type;
 
 /**
  * This class represents the NFC party which initiates a NFC connection. It
@@ -35,7 +47,7 @@ import ch.uzh.csg.nfclib.NfcMessage.Type;
  * @author Thomas Bocek (simplification, refactoring)
  * 
  */
-public class NfcSetup {
+public class NfcSetup implements CommSetup {
 	private static final String TAG = "ch.uzh.csg.nfclib.NfcSetup";
 	
 	public static final String NULL_ARGUMENT = "The message is null";
@@ -266,7 +278,7 @@ public class NfcSetup {
 		messageSplitter.clear();
 	}
 	
-	private void handshake(NfcTransceiver transceiver) throws IOException, NfcLibException {
+	private void handshake(NfcTransceiver transceiver) throws Exception {
 		if (Config.DEBUG) {
 			Log.d(TAG, "init NFC");
 		}
@@ -312,7 +324,7 @@ public class NfcSetup {
 		messageSplitter.maxTransceiveLength(Math.min(maxLenOther, maxLenThis));
 	}
 	
-	private void messageLoop(NfcTransceiver transceiver) throws IOException, NfcLibException {
+	private void messageLoop(NfcTransceiver transceiver) throws Exception {
 		if (Config.DEBUG) {
 			Log.d(TAG, "start message loop");
 		}
@@ -416,7 +428,7 @@ public class NfcSetup {
 		transceiver.turnOff(activity);
 	}
 	
-	private boolean validateSequence(final NfcMessage request, final NfcMessage response) {
+	public static boolean validateSequence(final NfcMessage request, final NfcMessage response) {
 		boolean check = request.sequenceNumber() == response.sequenceNumber();
 		if (!check) {
 			if (Config.DEBUG) {

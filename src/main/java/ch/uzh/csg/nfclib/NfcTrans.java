@@ -3,6 +3,8 @@ package ch.uzh.csg.nfclib;
 import java.io.IOException;
 
 import android.app.Activity;
+import ch.uzh.csg.comm.NfcLibException;
+import ch.uzh.csg.comm.NfcTransceiver;
 
 public interface NfcTrans {
 	/**

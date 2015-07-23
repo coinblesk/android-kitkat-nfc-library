@@ -1,4 +1,4 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 import java.util.Arrays;
 
@@ -68,6 +68,7 @@ public class NfcMessage {
 	public static final byte[] AID_COINBLESK_1 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x0 };
 	public static final byte[] AID_COINBLESK_2 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x36 };
 	public static final byte[] AID_COINBLESK_3 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
+	public static final byte[] BTLE_INIT = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_1;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_2;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_3;
@@ -101,7 +102,7 @@ public class NfcMessage {
 
 	// messages, uses the last 3 bits (bit 0-2), READ_BINARY, AID_1, AID_2, AID_3, NO_COINBLESK_MSG is never sent over the wire
 	public enum Type {
-		FIRST, FRAGMENT, FRAGMENT_LAST, POLLING, SINGLE, SINGLE_FIRST, ERROR, UNUSED, READ_BINARY, AID_1, AID_2, AID_3;
+		FIRST, FRAGMENT, FRAGMENT_LAST, POLLING, SINGLE, SINGLE_FIRST, ERROR, UNUSED, READ_BINARY, AID_1, AID_2, AID_3, BTLE_INIT;
 	}
 
 	// flags, uses bit 3
@@ -141,7 +142,10 @@ public class NfcMessage {
 		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_3)) {
 			// we got the initial handshake
 			type = Type.AID_3.ordinal();
-		} else {
+		} else if (Arrays.equals(input, BTLE_INIT)) {
+			type = Type.BTLE_INIT.ordinal();
+		}
+		else {
 			// this is now a custom message
 			//bit 0-3 are the types
 			type = input[0] & 0x07;

@@ -1,4 +1,4 @@
-package ch.uzh.csg.nfclib;
+package ch.uzh.csg.comm;
 
 import java.util.Arrays;
 import java.util.Deque;
@@ -6,7 +6,9 @@ import java.util.LinkedList;
 
 import android.nfc.cardemulation.HostApduService;
 import android.util.Log;
-import ch.uzh.csg.nfclib.NfcMessage.Type;
+import ch.uzh.csg.comm.NfcMessage.Type;
+import ch.uzh.csg.nfclib.HostApduServiceNfcLib;
+import ch.uzh.csg.nfclib.NfcSetup;
 
 /**
  * This class represents the counterpart of the {@link NfcSetup}. It listens
@@ -47,6 +49,7 @@ public class NfcResponder {
 	public NfcResponder(NfcResponseHandler responseHandler, int maxTransceiveLength) {
 		this.responseHandler = responseHandler;
 		this.maxTransceiveLength = maxTransceiveLength;
+		messageSplitter.maxTransceiveLength(maxTransceiveLength);
 		
 		lastMessageSent = null;
 		lastMessageReceived = null;	
@@ -120,9 +123,15 @@ public class NfcResponder {
 				lastMessageReceived = inputMessage;
 				return lastMessageSent.bytes();
 			}
-			outputMessage = handleRequest(inputMessage);
-			lastMessageReceived = inputMessage;
-			return prepareWrite(outputMessage);
+			try {
+				outputMessage = handleRequest(inputMessage);
+				lastMessageReceived = inputMessage;
+				return prepareWrite(outputMessage);
+			} catch (Exception e){
+				responseHandler.handleFailed(e.toString());
+				return new NfcMessage(Type.ERROR).bytes();
+			}
+			
 		}
 		
 	}
@@ -156,7 +165,7 @@ public class NfcResponder {
 		}
 	}
 
-	private NfcMessage handleRequest(final NfcMessage incoming) {
+	private NfcMessage handleRequest(final NfcMessage incoming) throws Exception {
 		if (Config.DEBUG) {
 			Log.d(TAG, "received: " + incoming);
 		}
@@ -226,7 +235,7 @@ public class NfcResponder {
 		}
 	}
 
-	private NfcMessage response(final byte[] payload, final boolean first) {
+	private NfcMessage response(final byte[] payload, final boolean first) throws Exception {
 		final byte[] response = responseHandler.handleMessageReceived(payload, new ResponseLater(){
 			@Override
 			public void response(byte[] data) {
