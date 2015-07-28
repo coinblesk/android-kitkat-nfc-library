@@ -21,22 +21,19 @@ public class NfcMessageTest {
 		Assert.assertEquals(Type.FIRST, m2.type());
 		Assert.assertEquals(0, m2.sequenceNumber());
 		Assert.assertEquals(100, m2.payload().length);
-		Assert.assertFalse(m2.isResume());
 	}
 	
 	@Test
 	public void testHeader2() {
 		NfcMessage m1 = new NfcMessage(Type.FRAGMENT);
-		m1.sequenceNumber(17);
+		m1.sequenceNumber(33);
 		m1.payload(new byte[1000]);
-		m1.resume();
 		byte[] transfer = m1.bytes();
 		NfcMessage m2 = new NfcMessage(transfer);
 		Assert.assertEquals(m1, m2);
 		Assert.assertEquals(Type.FRAGMENT, m2.type());
 		Assert.assertEquals(1, m2.sequenceNumber());
 		Assert.assertEquals(1000, m2.payload().length);
-		Assert.assertTrue(m2.isResume());
 	}
 	
 	@Test
@@ -44,14 +41,12 @@ public class NfcMessageTest {
 		NfcMessage m1 = new NfcMessage(Type.ERROR);
 		m1.sequenceNumber(5000);
 		m1.payload(new byte[10000]);
-		m1.resume();
 		byte[] transfer = m1.bytes();
 		NfcMessage m2 = new NfcMessage(transfer);
 		Assert.assertEquals(m1, m2);
 		Assert.assertEquals(Type.ERROR, m2.type());
 		Assert.assertEquals(8, m2.sequenceNumber());
 		Assert.assertEquals(10000, m2.payload().length);
-		Assert.assertTrue(m2.isResume());
 	}
 	
 	@Test
@@ -59,7 +54,6 @@ public class NfcMessageTest {
 		NfcMessage m1 = new NfcMessage(Type.AID_3);
 		m1.sequenceNumber(5000);
 		m1.payload(new byte[10000]);
-		m1.resume();
 		byte[] transfer = m1.bytes();
 		Assert.assertEquals(0xF5, transfer[transfer.length-2] & 0xff);
 	}

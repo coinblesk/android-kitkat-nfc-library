@@ -102,15 +102,11 @@ public class NfcMessage {
 
 	// messages, uses the last 3 bits (bit 0-2), READ_BINARY, AID_1, AID_2, AID_3, NO_COINBLESK_MSG is never sent over the wire
 	public enum Type {
-		FIRST, FRAGMENT, FRAGMENT_LAST, POLLING, SINGLE, SINGLE_FIRST, ERROR, UNUSED, READ_BINARY, AID_1, AID_2, AID_3, BTLE_INIT;
+		FIRST, FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, SINGLE_FIRST, ERROR, POLLING_RESPONSE, READ_BINARY, AID_1, AID_2, AID_3;
 	}
-
-	// flags, uses bit 3
-	public static final byte RESUME = 0x8;
 	
 	// data
 	private int type;
-	boolean resume;
 	private int sequenceNumber = 0;
 	private byte[] payload = new byte[0];
 
@@ -142,17 +138,13 @@ public class NfcMessage {
 		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_3)) {
 			// we got the initial handshake
 			type = Type.AID_3.ordinal();
-		} else if (Arrays.equals(input, BTLE_INIT)) {
-			type = Type.BTLE_INIT.ordinal();
 		}
 		else {
 			// this is now a custom message
 			//bit 0-3 are the types
 			type = input[0] & 0x07;
-			//bit 4 is the resume flag
-			resume = (input[0] & RESUME) != 0;
-			//bit 4-8 is are part of the sequence number
-			sequenceNumber = (input[0] & 0xFF) >>> 4;
+			//bit 3-8 is are part of the sequence number
+			sequenceNumber = (input[0] & 0xFF) >>> 3;
 
 			if (len > HEADER_LENGTH) {
 				final int payloadLen = len - HEADER_LENGTH;
@@ -209,7 +201,7 @@ public class NfcMessage {
 		if (previousMessage == null) {
 			sequenceNumber = 0;
 		} else {
-			sequenceNumber = (previousMessage.sequenceNumber + 1) % 16;
+			sequenceNumber = (previousMessage.sequenceNumber + 1) % 32;
 		}
 		return this;
 	}
@@ -245,7 +237,7 @@ public class NfcMessage {
 		} else {
 			check = previousMessage.sequenceNumber;
 		}
-		return sequenceNumber == (check + 1) % 16;
+		return sequenceNumber == (check + 1) % 32;
 	}
 	
 	/**
@@ -268,32 +260,6 @@ public class NfcMessage {
 	 */
 	public boolean isError() {
 		return type() == Type.ERROR;
-	}
-
-	/**
-	 * Returns true, if this is a resume message (i.e., the resume flag is set).
-	 */
-	public boolean isResume() {
-		return resume;
-	}
-
-	/**
-	 * Sets the resume flag of this message to the given value and returns it.
-	 * 
-	 * @param resume
-	 *            true or false
-	 */
-	public NfcMessage resume(final boolean resume) {
-		this.resume = resume;
-		return this;
-	}
-	
-	/**
-	 * Sets the resume flag of this message and returns it.
-	 */
-	public NfcMessage resume() {
-		resume(true);
-		return this;
 	}
 	
 	public boolean isFirst() {
@@ -369,9 +335,7 @@ public class NfcMessage {
 
 		final int len = payload.length;
 		final byte[] output = new byte[HEADER_LENGTH + len];
-		output[0] = (byte) ((type & 0x7) | ((sequenceNumber << 4) & 0xF0));
-		//set resume flag
-		output[0] = (byte) (resume ? output[0] | RESUME : output[0] & ~RESUME);  
+		output[0] = (byte) ((type & 0x7) | ((sequenceNumber << 3) & 0xF8));
 		System.arraycopy(payload, 0, output, HEADER_LENGTH, len);
 		return output;
 	}
@@ -385,9 +349,8 @@ public class NfcMessage {
 			return false;
 		}
 		final NfcMessage m = (NfcMessage) o;
-		return m.resume == resume 
-				&& m.type == type 
-				&& (m.sequenceNumber % 16) == (sequenceNumber % 16) 
+		return m.type == type 
+				&& (m.sequenceNumber % 32) == (sequenceNumber % 32) 
 				&& Arrays.equals(m.payload, payload);
 	}
 
@@ -397,9 +360,6 @@ public class NfcMessage {
 		sb.append("type: ").append(type().toString());
 		sb.append("/").append(sequenceNumber);
 		sb.append(",len:").append(payload.length);
-		sb.append(",resume:").append(isResume());
 		return sb.toString();
-	}
-
-	
+	}	
 }

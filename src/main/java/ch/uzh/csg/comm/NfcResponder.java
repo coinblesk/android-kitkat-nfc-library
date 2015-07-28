@@ -220,13 +220,15 @@ public class NfcResponder {
 				}
 				return new NfcMessage(Type.ERROR);
 			}
-		case POLLING:
+		case POLLING_RESPONSE:
 			NfcMessage msg = checkForData();
 			if (msg != null) {
 				return msg;
 			} else {
-				return new NfcMessage(Type.POLLING);
+				return new NfcMessage(Type.POLLING_REQUEST);
 			}
+		case POLLING_REQUEST:
+			return new NfcMessage(Type.POLLING_RESPONSE);
 		default:
 			if (Config.DEBUG) {
 				Log.e(TAG, "unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
@@ -247,7 +249,7 @@ public class NfcResponder {
 		// the user can decide to use sendLater. In that case, we'll start
 		// to poll. This is triggered by returning null.
 		if (response == null) {
-			return new NfcMessage(NfcMessage.Type.POLLING);
+			return new NfcMessage(NfcMessage.Type.POLLING_REQUEST);
 		} else {
 			return fragmentData(response, false);
 		}

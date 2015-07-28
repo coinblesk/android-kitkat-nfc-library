@@ -132,6 +132,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 				byte[] retVal = isoDep.transceive(input);
 				return retVal;
 			} catch (IOException e) {
+				e.printStackTrace();
 				nfcInit.tagLost(this);
 				isoDep.close();
 				throw new NfcLibException("connection seems to be lost: ", e);
@@ -178,7 +179,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		 */
 		//Bundle options = new Bundle();
 		//this causes a huge delay for a second reconnect! don't use this! -> setting this to 0 crashes the Oneplus One
-		//options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 0);
+		//options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 1000);
 
 		nfcAdapter.enableReaderMode(activity, 
 				this, NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK, Bundle.EMPTY);
@@ -196,14 +197,16 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		if (Config.DEBUG) {
 			Log.d(TAG, "turn off device");
 		}
-		try {
-			isoDep.close();
-		} catch (Throwable e) {
-			if (Config.DEBUG) {
-				Log.d(TAG, "could not close isodep", e);
+		if(isoDep!=null) {
+			try {
+				isoDep.close();
+			} catch (Throwable e) {
+				Log.e(TAG, "could not close isodep", e);
 			}
 		}
-		nfcAdapter.disableReaderMode(activity);
+		if (nfcAdapter.isEnabled()) {
+			nfcAdapter.disableReaderMode(activity);
+		}
 	}
 	
 }

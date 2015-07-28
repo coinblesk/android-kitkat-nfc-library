@@ -160,7 +160,6 @@ public class NfcSetup implements CommSetup {
 					initiatorHandler.handleStatus("handshake complete");
 					// check if we should resume
 					if (!messageQueue.isEmpty()) {
-						messageQueue.peek().resume();
 						if (!processMessage(nfcTransceiver)) {
 							return;
 						}
@@ -170,14 +169,15 @@ public class NfcSetup implements CommSetup {
 						boolean first = initiatorHandler.isFirst();
 						byte[] message = initiatorHandler.nextMessage();
 						if (message == null) {
-							initiatorHandler.handleFailed("noting to do");
-							return;
-						}
+							//start polling
+							messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
+						} else {
 
-						// split it
-						for (NfcMessage msg : messageSplitter.getFragments(
-								message, first)) {
-							messageQueue.offer(msg);
+							// split it
+							for (NfcMessage msg : messageSplitter.getFragments(
+									message, first)) {
+								messageQueue.offer(msg);
+							}
 						}
 
 						if (!processMessage(nfcTransceiver)) {
@@ -223,7 +223,7 @@ public class NfcSetup implements CommSetup {
 //					I/DEBUG   (  270): Tombstone written to: /data/tombstones/tombstone_01
 					try {
 						while (true) {
-							NfcMessage request = new NfcMessage(Type.POLLING);
+							NfcMessage request = new NfcMessage(Type.POLLING_REQUEST);
 							request.sequenceNumber(lastMessageSent);
 							nfcTransceiver.write(request.bytes());
 							lastMessageSent = request; 
@@ -308,7 +308,7 @@ public class NfcSetup implements CommSetup {
 			Log.d(TAG, "handshake response: "+Arrays.toString(response));
 		}
 		// --> here we can get an exception. We should get back this array: {2,0,0,0,x}
-		if (!responseMessage.isSingleFirst() || responseMessage.sequenceNumber() != 0 || responseMessage.isResume()) {
+		if (!responseMessage.isSingleFirst() || responseMessage.sequenceNumber() != 0) {
 			if (Config.DEBUG) {
 				Log.e(TAG, "handshake header unexpected: " + responseMessage);
 			}
@@ -389,8 +389,10 @@ public class NfcSetup implements CommSetup {
 					}
 				}
 				break;
-			case POLLING:
-				messageQueue.offer(new NfcMessage(Type.POLLING));
+			case POLLING_REQUEST:
+				messageQueue.offer(new NfcMessage(Type.POLLING_RESPONSE));
+				break;
+			case POLLING_RESPONSE:
 				break;
 			case ERROR:
 				throw new IOException("the message "+request+" caused an exception on the other side");

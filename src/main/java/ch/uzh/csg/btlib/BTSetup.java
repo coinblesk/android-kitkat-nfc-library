@@ -162,7 +162,6 @@ public class BTSetup implements CommSetup {
 		initiatorHandler.handleStatus("handshake complete");
 		// check if we should resume
 		if (!messageQueue.isEmpty()) {
-			messageQueue.peek().resume();
 			if (!processMessage(nfcTransceiver)) {
 				System.err.println("return false1");
 				return;
@@ -268,9 +267,6 @@ public class BTSetup implements CommSetup {
 						throw new IOException("message queue empty, cannot send fragments");
 					}
 				}
-				break;
-			case POLLING:
-				messageQueue.offer(new NfcMessage(Type.POLLING));
 				break;
 			case ERROR:
 				throw new IOException("the message "+request+" caused an exception on the other side");
