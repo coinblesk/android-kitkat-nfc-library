@@ -62,6 +62,10 @@ public class NfcResponder {
 		
 		NfcMessage inputMessage = new NfcMessage(bytes);
 		
+		if(inputMessage.isFirst()) {
+			reset();
+		}
+		
 		
 		byte[] intVal;
 		int maxLen;
@@ -99,10 +103,6 @@ public class NfcResponder {
 		default:
 			if (Config.DEBUG) {
 				Log.d(TAG, "process regular message " + inputMessage);
-			}
-			
-			if(inputMessage.isFirst()) {
-				reset();
 			}
 			
 			final boolean check = inputMessage.check(lastMessageReceived);
