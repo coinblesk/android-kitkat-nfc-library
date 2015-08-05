@@ -68,6 +68,7 @@ public class NfcSetup implements CommSetup {
 	private NfcMessage lastMessageSent;
 	
 	private volatile boolean initiating = true;
+	private volatile boolean first = false;
 	
 	final public class AppBroadcastReceiver extends BroadcastReceiver {
 		
@@ -167,7 +168,6 @@ public class NfcSetup implements CommSetup {
 					}
 					// get the complete message
 					while (initiatorHandler.hasMoreMessages()) {
-						boolean first = initiatorHandler.isFirst();
 						byte[] message = initiatorHandler.nextMessage();
 						if (message == null) {
 							//start polling
@@ -303,6 +303,10 @@ public class NfcSetup implements CommSetup {
 		default:
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
+		if(first) {
+			initMessage.first();
+			first = false;
+		}
 		
 		// no sequence number here,initiating.set( as this is a special message
 		if (Config.DEBUG) {
@@ -336,6 +340,7 @@ public class NfcSetup implements CommSetup {
 		}
 		while (!messageQueue.isEmpty()) {
 			final NfcMessage request = messageQueue.peek();
+			
 			request.sequenceNumber(lastMessageSent);
 			
 			if (Config.DEBUG) {
@@ -419,6 +424,7 @@ public class NfcSetup implements CommSetup {
 		reset();
 		transceiver.turnOn(activity);
 		initiating = true;
+		first = true;
 	}
 	
 	/**

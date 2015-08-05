@@ -101,9 +101,12 @@ public class NfcResponder {
 				Log.d(TAG, "process regular message " + inputMessage);
 			}
 			
+			if(inputMessage.isFirst()) {
+				reset();
+			}
+			
 			final boolean check = inputMessage.check(lastMessageReceived);
 			final boolean repeat = inputMessage.repeatLast(lastMessageReceived);
-			
 			
 			NfcMessage outputMessage = null;
 			if (!check && !repeat) {
@@ -182,9 +185,6 @@ public class NfcResponder {
 		
 		case SINGLE:
 			NfcMessage msg = response(incoming.payload());
-			if(!responseHandler.expectMoreMessages()) {
-				reset();
-			}
 			return msg;
 		case FRAGMENT:
 		case FRAGMENT_LAST:
@@ -213,13 +213,7 @@ public class NfcResponder {
 					responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
 					return new NfcMessage(Type.ERROR);
 				}
-				msg = messageQueue.poll();
-				if(msg.type() == Type.FRAGMENT_LAST) {
-					if(!responseHandler.expectMoreMessages()) {
-						reset();
-					}
-				}
-				return msg;
+				return messageQueue.poll();
 			} else {
 				if (Config.DEBUG) {
 					Log.e(TAG, "unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);

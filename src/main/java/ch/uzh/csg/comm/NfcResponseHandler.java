@@ -23,8 +23,6 @@ public interface NfcResponseHandler {
 	 */
 	public abstract byte[] handleMessageReceived(byte[] message, ResponseLater responseLater) throws Exception;
 	
-	public boolean expectMoreMessages();
-	
 	public abstract void handleFailed(String message);
 	
 	/**

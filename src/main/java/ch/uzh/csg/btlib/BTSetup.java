@@ -169,7 +169,6 @@ public class BTSetup implements CommSetup {
 		}
 		// get the complete message
 		while (initiatorHandler.hasMoreMessages()) {
-			boolean first = initiatorHandler.isFirst();
 			byte[] message = initiatorHandler.nextMessage();
 			if (message == null) {
 				initiatorHandler.handleFailed("noting to do");

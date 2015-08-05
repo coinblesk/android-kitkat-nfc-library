@@ -64,14 +64,29 @@ public class NfcMessage {
 	 * so-called "SELECT AID" APDU as defined in the ISO/IEC 7816-4
 	 * specification.
 	 */
+	
+//	  <aid-filter android:name="F0F00777FF5500" />
+//    <aid-filter android:name="F0F00777FF5536" />
+//    <aid-filter android:name="F0F00777FF55F5" />
+//    <aid-filter android:name="F0F00777FF5400" />
+//    <aid-filter android:name="F0F00777FF5436" />
+//    <aid-filter android:name="F0F00777FF54F5" />
+  
 	public static final byte[] CLA_INS_P1_P2 = { 0x00, (byte) 0xA4, 0x04, 0x00 };
 	public static final byte[] AID_COINBLESK_1 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x0 };
 	public static final byte[] AID_COINBLESK_2 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x36 };
 	public static final byte[] AID_COINBLESK_3 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
+	//this one indicates that we are the first message. So reset the other side, regardless the message type
+	public static final byte AID_COINBLESK_FIRST = 0x54;
+	public static final int AID_COINBLESK_FIRST_POS = 6;
+	
 	public static final byte[] BTLE_INIT = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_1;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_2;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_3;
+	public static final byte[] CLA_INS_P1_P2_COINBLESK_1_FIRST;
+	public static final byte[] CLA_INS_P1_P2_COINBLESK_2_FIRST;
+	public static final byte[] CLA_INS_P1_P2_COINBLESK_3_FIRST;
 	static {
 		// for details see:
 		// http://www.cardwerk.com/smartcards/smartcard_standard_ISO7816-4_9_application-independent_card_services.aspx
@@ -94,6 +109,15 @@ public class NfcMessage {
 				CLA_INS_P1_P2[2], CLA_INS_P1_P2[3], Lc3, AID_COINBLESK_3[0], AID_COINBLESK_3[1], 
 				AID_COINBLESK_3[2], AID_COINBLESK_3[3], AID_COINBLESK_3[4], AID_COINBLESK_3[5], 
 				AID_COINBLESK_3[6], Le };
+		
+		CLA_INS_P1_P2_COINBLESK_1_FIRST = CLA_INS_P1_P2_COINBLESK_1.clone();
+		CLA_INS_P1_P2_COINBLESK_2_FIRST = CLA_INS_P1_P2_COINBLESK_2.clone();
+		CLA_INS_P1_P2_COINBLESK_3_FIRST = CLA_INS_P1_P2_COINBLESK_3.clone();
+		
+		CLA_INS_P1_P2_COINBLESK_1_FIRST[AID_COINBLESK_FIRST_POS] = AID_COINBLESK_FIRST;
+		CLA_INS_P1_P2_COINBLESK_2_FIRST[AID_COINBLESK_FIRST_POS] = AID_COINBLESK_FIRST;
+		CLA_INS_P1_P2_COINBLESK_3_FIRST[AID_COINBLESK_FIRST_POS] = AID_COINBLESK_FIRST;	
+		
 	}
 
 	public static final byte[] READ_BINARY = { 0x00, (byte) 0xB0, 0x00, 0x00, 0x01 };
@@ -109,6 +133,7 @@ public class NfcMessage {
 	private int type;
 	private int sequenceNumber = 0;
 	private byte[] payload = new byte[0];
+	private boolean first = false;
 
 	/**
 	 * Sets the data of this message and returns it.
@@ -138,6 +163,18 @@ public class NfcMessage {
 		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_3)) {
 			// we got the initial handshake
 			type = Type.AID_3.ordinal();
+		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_1_FIRST)) {
+			// we got the initial handshake
+			type = Type.AID_1.ordinal();
+			first = true;
+		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_2_FIRST)) {
+			// we got the initial handshake
+			type = Type.AID_2.ordinal();
+			first = true;
+		} else if (Arrays.equals(input, CLA_INS_P1_P2_COINBLESK_3_FIRST)) {
+			// we got the initial handshake
+			type = Type.AID_3.ordinal();
+			first = true;
 		}
 		else {
 			// this is now a custom message
@@ -300,6 +337,19 @@ public class NfcMessage {
 	public boolean isGetNextFragment() {
 		return type() == Type.FRAGMENT && payload.length == 0;
 	}
+	
+	public NfcMessage first(boolean first) {
+		this.first = first;
+		return this;
+	}
+	
+	public NfcMessage first() {
+		return first(true);
+	}
+	
+	public boolean isFirst() {
+		return first;
+	}
 
 	/**
 	 * Returns the bytes of this message (i.e., serializes it).
@@ -308,11 +358,11 @@ public class NfcMessage {
 	public byte[] bytes() {
 		switch(type()) {
 		case AID_1: //no limit
-			return CLA_INS_P1_P2_COINBLESK_1;
+			return first ? CLA_INS_P1_P2_COINBLESK_1_FIRST : CLA_INS_P1_P2_COINBLESK_1;
 		case AID_2: //54 byte limit
-			return CLA_INS_P1_P2_COINBLESK_2;
+			return first ? CLA_INS_P1_P2_COINBLESK_2_FIRST : CLA_INS_P1_P2_COINBLESK_2;
 		case AID_3: //245 byte limit
-			return CLA_INS_P1_P2_COINBLESK_3;
+			return first ? CLA_INS_P1_P2_COINBLESK_3_FIRST : CLA_INS_P1_P2_COINBLESK_3;
 		case READ_BINARY:
 			return new byte[] { 0x00 };
 		}

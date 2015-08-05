@@ -33,6 +33,6 @@ public interface NfcInitiatorHandler {
 
 	public abstract byte[] nextMessage() throws Exception;
 	
-	public abstract boolean isFirst();
+	//public abstract boolean isFirst();
 
 }
