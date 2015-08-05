@@ -177,8 +177,7 @@ public class BTSetup implements CommSetup {
 			}
 
 			// split it
-			for (NfcMessage msg : messageSplitter.getFragments(
-					message, first)) {
+			for (NfcMessage msg : messageSplitter.getFragments(message)) {
 				messageQueue.offer(msg);
 			}
 
@@ -240,14 +239,12 @@ public class BTSetup implements CommSetup {
 				
 			switch (responseMessage.type()) {
 			case SINGLE:
-			case SINGLE_FIRST:
 			case FRAGMENT:
 			case FRAGMENT_LAST:
 				if(responseMessage.payload().length > 0) {
 					//we receive fragments
 					switch (responseMessage.type()) {
 					case SINGLE:
-					case SINGLE_FIRST:
 						initiatorHandler.handleMessageReceived(responseMessage.payload());
 						break;
 					case FRAGMENT:

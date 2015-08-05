@@ -79,7 +79,7 @@ public class NfcResponder {
 			maxLen = Math.min(Integer.MAX_VALUE, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
+			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
 		case AID_2:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID2 selected");
@@ -87,7 +87,7 @@ public class NfcResponder {
 			maxLen = Math.min(53, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
+			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
 		case AID_3:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID3 selected");
@@ -95,13 +95,10 @@ public class NfcResponder {
 			maxLen = Math.min(245, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE_FIRST).payload(intVal).bytes();
+			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
 		default:
 			if (Config.DEBUG) {
 				Log.d(TAG, "process regular message " + inputMessage);
-			}
-			if(inputMessage.type() == Type.SINGLE_FIRST || inputMessage.type()==Type.FIRST) {
-				reset();
 			}
 			
 			final boolean check = inputMessage.check(lastMessageReceived);
@@ -128,6 +125,7 @@ public class NfcResponder {
 				lastMessageReceived = inputMessage;
 				return prepareWrite(outputMessage);
 			} catch (Exception e){
+				reset();
 				responseHandler.handleFailed(e.toString());
 				return new NfcMessage(Type.ERROR).bytes();
 			}
@@ -174,6 +172,7 @@ public class NfcResponder {
 			if (Config.DEBUG) {
 				Log.d(TAG, "nfc error reported - returning null");
 			}
+			reset();
 			responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
 			return null;
 		}
@@ -181,18 +180,15 @@ public class NfcResponder {
 		switch (incoming.type()) {
 		
 		case SINGLE:
-			return response(incoming.payload(), false);
-		case SINGLE_FIRST:
-			return response(incoming.payload(), true);
-		case FIRST:
+			NfcMessage msg = response(incoming.payload());
+			if(!responseHandler.expectMoreMessages()) {
+				reset();
+			}
+			return msg;
 		case FRAGMENT:
 		case FRAGMENT_LAST:
 			if(incoming.payload().length > 0) {
 				switch (incoming.type()) {
-					case FIRST:
-						reset(); //this is the very first message, clean all states
-						messageSplitter.reassemble(incoming);
-						return new NfcMessage(Type.FRAGMENT);
 					case FRAGMENT:
 						messageSplitter.reassemble(incoming);
 						return new NfcMessage(Type.FRAGMENT);
@@ -200,8 +196,10 @@ public class NfcResponder {
 						messageSplitter.reassemble(incoming);
 						final byte[] receivedData = messageSplitter.data();
 						messageSplitter.clear();
-						return response(receivedData, incoming.isFirst());
+						return response(receivedData);
 					default:
+						reset();
+						responseHandler.handleFailed("unexpected type");
 						return new NfcMessage(Type.ERROR);
 				}
 			} else if (incoming.type() == Type.FRAGMENT){
@@ -210,18 +208,27 @@ public class NfcResponder {
 					if (Config.DEBUG) {
 						Log.e(TAG, "nothing to return (get next fragment)");
 					}
+					reset();
 					responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
 					return new NfcMessage(Type.ERROR);
 				}
-				return messageQueue.poll();
+				msg = messageQueue.poll();
+				if(msg.type() == Type.FRAGMENT_LAST) {
+					if(!responseHandler.expectMoreMessages()) {
+						reset();
+					}
+				}
+				return msg;
 			} else {
 				if (Config.DEBUG) {
 					Log.e(TAG, "unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);
 				}
+				reset();
+				responseHandler.handleFailed("unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);
 				return new NfcMessage(Type.ERROR);
 			}
 		case POLLING_RESPONSE:
-			NfcMessage msg = checkForData();
+			msg = checkForData();
 			if (msg != null) {
 				return msg;
 			} else {
@@ -229,20 +236,25 @@ public class NfcResponder {
 			}
 		case POLLING_REQUEST:
 			return new NfcMessage(Type.POLLING_RESPONSE);
+		case ERROR:
+			reset();
+			return new NfcMessage(Type.ERROR);
 		default:
 			if (Config.DEBUG) {
 				Log.e(TAG, "unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
 			}
+			reset();
+			responseHandler.handleFailed("unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
 			return new NfcMessage(Type.ERROR);
 		}
 	}
 
-	private NfcMessage response(final byte[] payload, final boolean first) throws Exception {
+	private NfcMessage response(final byte[] payload) throws Exception {
 		final byte[] response = responseHandler.handleMessageReceived(payload, new ResponseLater(){
 			@Override
 			public void response(byte[] data) {
 				synchronized (lock) {
-					lateMessage = fragmentData(data, first);
+					lateMessage = fragmentData(data);
 				}
 			}});
 		
@@ -251,15 +263,15 @@ public class NfcResponder {
 		if (response == null) {
 			return new NfcMessage(NfcMessage.Type.POLLING_REQUEST);
 		} else {
-			return fragmentData(response, false);
+			return fragmentData(response);
 		}
 	}
 
-	private NfcMessage fragmentData(byte[] response, boolean first) {
+	private NfcMessage fragmentData(byte[] response) {
 		if (response == null) {
 			return null;
 		}
-		for (NfcMessage msg : messageSplitter.getFragments(response, first)) {
+		for (NfcMessage msg : messageSplitter.getFragments(response)) {
 			messageQueue.offer(msg);
 		}
 
@@ -271,8 +283,9 @@ public class NfcResponder {
 			if (Config.DEBUG) {
 				Log.e(TAG, "nothing to return - message queue is empty");
 			}
-			
-			responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
+			reset();
+			responseHandler.handleFailed("nothing to return - message queue is empty");
+			return new NfcMessage(Type.ERROR);
 		}
 		return messageQueue.poll();
 	}

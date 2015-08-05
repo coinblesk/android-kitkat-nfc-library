@@ -49,7 +49,7 @@ public class NfcMessageSplitter {
 	 *            the whole message or byte array to be send by NFC
 	 * @return an ArrayList of NfcMessages containing the fragmented payload
 	 */
-	public ArrayList<NfcMessage> getFragments(final byte[] payload, final boolean firstMessage) {
+	public ArrayList<NfcMessage> getFragments(final byte[] payload) {
 		final int len = payload.length;
 		/*
 		 * Returns the number of fragments the whole message needs to be split
@@ -60,7 +60,7 @@ public class NfcMessageSplitter {
 		final ArrayList<NfcMessage> list = new ArrayList<NfcMessage>(fragments);
 		
 		if(fragments == 1) {
-			final NfcMessage nfcMessage = new NfcMessage(firstMessage ? Type.SINGLE_FIRST : Type.SINGLE).payload(payload);
+			final NfcMessage nfcMessage = new NfcMessage(Type.SINGLE).payload(payload);
 			list.add(nfcMessage);
 			return list;
 		}
@@ -72,9 +72,7 @@ public class NfcMessageSplitter {
 
 			final byte[] temp = Arrays.copyOfRange(payload, start, end);
 			final Type type;
-			if(i == 0 && firstMessage) {
-				type = Type.FIRST;
-			} else if(last) {
+			if(last) {
 				type = Type.FRAGMENT_LAST;
 			} else {
 				type = Type.FRAGMENT;

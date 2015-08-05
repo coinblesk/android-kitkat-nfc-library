@@ -12,13 +12,13 @@ public class NfcMessageTest {
 	
 	@Test
 	public void testHeader1() {
-		NfcMessage m1 = new NfcMessage(Type.FIRST);
+		NfcMessage m1 = new NfcMessage(Type.ERROR);
 		m1.sequenceNumber(1024);
 		m1.payload(new byte[100]);
 		byte[] transfer = m1.bytes();
 		NfcMessage m2 = new NfcMessage(transfer);
 		Assert.assertEquals(m1, m2);
-		Assert.assertEquals(Type.FIRST, m2.type());
+		Assert.assertEquals(Type.ERROR, m2.type());
 		Assert.assertEquals(0, m2.sequenceNumber());
 		Assert.assertEquals(100, m2.payload().length);
 	}
@@ -63,7 +63,7 @@ public class NfcMessageTest {
 		byte[] intVal = Utils.intToByteArray(1);
 		NfcMessage m1 = new NfcMessage(Type.SINGLE).payload(intVal);
 		byte[] transfer = m1.bytes();
-		byte[] expected = new byte[]{4,0,0,0,1};
+		byte[] expected = new byte[]{3,0,0,0,1};
 		Assert.assertArrayEquals(expected, transfer);
 	}
 	

@@ -102,7 +102,7 @@ public class NfcMessage {
 
 	// messages, uses the last 3 bits (bit 0-2), READ_BINARY, AID_1, AID_2, AID_3, NO_COINBLESK_MSG is never sent over the wire
 	public enum Type {
-		FIRST, FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, SINGLE_FIRST, ERROR, POLLING_RESPONSE, READ_BINARY, AID_1, AID_2, AID_3;
+		FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, ERROR, POLLING_RESPONSE, RESET, UNUSED2, READ_BINARY, AID_1, AID_2, AID_3;
 	}
 	
 	// data
@@ -261,28 +261,12 @@ public class NfcMessage {
 	public boolean isError() {
 		return type() == Type.ERROR;
 	}
-	
-	public boolean isFirst() {
-		return type() == Type.FIRST;
-	}
-	
-	public NfcMessage first() {
-		type = Type.FIRST.ordinal();
-		return this;
-	}
 
 	/**
 	 * Returns true if the type of this message is read binary.
 	 */
 	public boolean isReadBinary() {
 		return type() == Type.READ_BINARY;
-	}
-
-	/**
-	 * Returns true if the type of this message is aid selected
-	 */
-	public boolean isSingleFirst() {
-		return type() == Type.SINGLE_FIRST;
 	}
 	
 	/**

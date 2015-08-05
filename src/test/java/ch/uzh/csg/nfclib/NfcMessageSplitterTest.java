@@ -19,7 +19,7 @@ public class NfcMessageSplitterTest  {
 		byte[] payload = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 		NfcMessageSplitter splitter = new NfcMessageSplitter();
 		splitter.maxTransceiveLength(5);
-		ArrayList<NfcMessage> fragments = splitter.getFragments(payload, false);
+		ArrayList<NfcMessage> fragments = splitter.getFragments(payload);
 		
 		assertEquals(3, fragments.size());
 		
@@ -44,7 +44,7 @@ public class NfcMessageSplitterTest  {
 		byte[] payload = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 		NfcMessageSplitter splitter = new NfcMessageSplitter();
 		splitter.maxTransceiveLength(6);
-		ArrayList<NfcMessage> fragments = splitter.getFragments(payload, false);
+		ArrayList<NfcMessage> fragments = splitter.getFragments(payload);
 		
 		assertEquals(2, fragments.size());
 		
@@ -64,7 +64,7 @@ public class NfcMessageSplitterTest  {
 		byte[] payload = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 		NfcMessageSplitter splitter = new NfcMessageSplitter();
 		splitter.maxTransceiveLength(10);
-		ArrayList<NfcMessage> fragments = splitter.getFragments(payload, false);
+		ArrayList<NfcMessage> fragments = splitter.getFragments(payload);
 		
 		assertEquals(1, fragments.size());
 		
@@ -79,7 +79,7 @@ public class NfcMessageSplitterTest  {
 		byte[] payload = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 		NfcMessageSplitter splitter = new NfcMessageSplitter();
 		splitter.maxTransceiveLength(30);
-		ArrayList<NfcMessage> fragments = splitter.getFragments(payload, false);
+		ArrayList<NfcMessage> fragments = splitter.getFragments(payload);
 		
 		assertEquals(1, fragments.size());
 		

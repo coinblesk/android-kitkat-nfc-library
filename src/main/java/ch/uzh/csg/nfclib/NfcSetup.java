@@ -174,8 +174,7 @@ public class NfcSetup implements CommSetup {
 						} else {
 
 							// split it
-							for (NfcMessage msg : messageSplitter.getFragments(
-									message, first)) {
+							for (NfcMessage msg : messageSplitter.getFragments(message)) {
 								messageQueue.offer(msg);
 							}
 						}
@@ -265,6 +264,7 @@ public class NfcSetup implements CommSetup {
 			messageLoop(transceiver);
 		} catch (Throwable t) {
 			t.printStackTrace();
+			reset();
 			initiatorHandler.handleFailed(t.toString());
 			return false;
 		}
@@ -308,7 +308,7 @@ public class NfcSetup implements CommSetup {
 			Log.d(TAG, "handshake response: "+Arrays.toString(response));
 		}
 		// --> here we can get an exception. We should get back this array: {2,0,0,0,x}
-		if (!responseMessage.isSingleFirst() || responseMessage.sequenceNumber() != 0) {
+		if (responseMessage.sequenceNumber() != 0) {
 			if (Config.DEBUG) {
 				Log.e(TAG, "handshake header unexpected: " + responseMessage);
 			}
@@ -361,14 +361,12 @@ public class NfcSetup implements CommSetup {
 			
 			switch (responseMessage.type()) {
 			case SINGLE:
-			case SINGLE_FIRST:
 			case FRAGMENT:
 			case FRAGMENT_LAST:
 				if(responseMessage.payload().length > 0) {
 					//we receive fragments
 					switch (responseMessage.type()) {
 					case SINGLE:
-					case SINGLE_FIRST:
 						initiatorHandler.handleMessageReceived(responseMessage.payload());
 						break;
 					case FRAGMENT:
