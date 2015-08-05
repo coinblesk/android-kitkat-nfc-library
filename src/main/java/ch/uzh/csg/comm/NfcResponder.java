@@ -125,6 +125,7 @@ public class NfcResponder {
 				lastMessageReceived = inputMessage;
 				return prepareWrite(outputMessage);
 			} catch (Exception e){
+			    
 				reset();
 				responseHandler.handleFailed(e.toString());
 				return new NfcMessage(Type.ERROR).bytes();

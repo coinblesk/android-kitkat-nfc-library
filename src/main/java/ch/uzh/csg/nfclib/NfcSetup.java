@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.nfc.TagLostException;
 import android.util.Log;
 import ch.uzh.csg.comm.CommSetup;
 import ch.uzh.csg.comm.Config;
@@ -262,6 +263,11 @@ public class NfcSetup implements CommSetup {
 	private boolean processMessage(NfcTransceiver transceiver) {
 		try {
 			messageLoop(transceiver);
+		} catch (NfcLibException e) {
+		    if (Config.DEBUG) {
+	            Log.d(TAG, "Tag lost");
+	        }
+		    return false;
 		} catch (Throwable t) {
 			t.printStackTrace();
 			reset();
