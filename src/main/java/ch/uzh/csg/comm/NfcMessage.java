@@ -78,7 +78,7 @@ public class NfcMessage {
 	public static final byte[] AID_COINBLESK_3 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
 	//this one indicates that we are the first message. So reset the other side, regardless the message type
 	public static final byte AID_COINBLESK_FIRST = 0x54;
-	public static final int AID_COINBLESK_FIRST_POS = 6;
+	public static final int AID_COINBLESK_FIRST_POS = 10;
 	
 	public static final byte[] BTLE_INIT = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_1;
