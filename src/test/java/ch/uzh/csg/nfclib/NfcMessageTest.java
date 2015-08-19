@@ -67,6 +67,33 @@ public class NfcMessageTest {
 		Assert.assertArrayEquals(expected, transfer);
 	}
 	
+	@Test
+	public void testHeader6() {
+		NfcMessage m1 = new NfcMessage(Type.ERROR);
+		m1.sequenceNumber(17);
+		m1.payload(new byte[10000]);
+		byte[] transfer = m1.bytes();
+		NfcMessage m2 = new NfcMessage(transfer);
+		Assert.assertEquals(m1, m2);
+		Assert.assertEquals(Type.ERROR, m2.type());
+		Assert.assertEquals(1, m2.sequenceNumber());
+		Assert.assertEquals(10000, m2.payload().length);
+	}
+	
+	@Test
+	public void testHeader7() {
+		NfcMessage m1 = new NfcMessage(Type.POLLING_REQUEST);
+		m1.sequenceNumber(16);
+		m1.payload(new byte[0]);
+		byte[] transfer = m1.bytes();
+		Assert.assertEquals(2, transfer.length);
+		NfcMessage m2 = new NfcMessage(transfer);
+		Assert.assertEquals(m1, m2);
+		Assert.assertEquals(Type.POLLING_REQUEST, m2.type());
+		Assert.assertEquals(0, m2.sequenceNumber());
+		Assert.assertEquals(0, m2.payload().length);
+	}
+	
 	
 
 }

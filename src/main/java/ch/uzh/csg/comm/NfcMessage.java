@@ -71,6 +71,8 @@ public class NfcMessage {
 //    <aid-filter android:name="F0F00777FF5400" />
 //    <aid-filter android:name="F0F00777FF5436" />
 //    <aid-filter android:name="F0F00777FF54F5" />
+	
+	public static final int HEADER_LENGTH = 1;
   
 	public static final byte[] CLA_INS_P1_P2 = { 0x00, (byte) 0xA4, 0x04, 0x00 };
 	public static final byte[] AID_COINBLESK_1 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x0 };
@@ -94,7 +96,7 @@ public class NfcMessage {
 		final byte Lc2 = (byte) AID_COINBLESK_2.length;
 		final byte Lc3 = (byte) AID_COINBLESK_3.length;
 		// we return 1 + 4 bytes
-		final byte Le = 5;
+		final byte Le = HEADER_LENGTH + 4;
 		CLA_INS_P1_P2_COINBLESK_1 = new byte[] { CLA_INS_P1_P2[0], CLA_INS_P1_P2[1], 
 				CLA_INS_P1_P2[2], CLA_INS_P1_P2[3], Lc1, AID_COINBLESK_1[0], AID_COINBLESK_1[1], 
 				AID_COINBLESK_1[2], AID_COINBLESK_1[3], AID_COINBLESK_1[4], AID_COINBLESK_1[5], 
@@ -122,18 +124,22 @@ public class NfcMessage {
 
 	public static final byte[] READ_BINARY = { 0x00, (byte) 0xB0, 0x00, 0x00, 0x01 };
 
-	public static final int HEADER_LENGTH = 1;
+	
 
 	// messages, uses the last 3 bits (bit 0-2), READ_BINARY, AID_1, AID_2, AID_3, NO_COINBLESK_MSG is never sent over the wire
 	public enum Type {
 		FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, ERROR, POLLING_RESPONSE, RESET, UNUSED2, READ_BINARY, AID_1, AID_2, AID_3;
 	}
 	
+	//Hack for NXP devices that require to have the smallest packet of 2 bytes
+	public static final int IS_EMPTY = 0x8;
+	
 	// data
-	private int type;
+	private final int type;
 	private int sequenceNumber = 0;
 	private byte[] payload = new byte[0];
 	private boolean first = false;
+	private boolean isEmpty = false;
 
 	/**
 	 * Sets the data of this message and returns it.
@@ -180,10 +186,11 @@ public class NfcMessage {
 			// this is now a custom message
 			//bit 0-3 are the types
 			type = input[0] & 0x07;
-			//bit 3-8 is are part of the sequence number
-			sequenceNumber = (input[0] & 0xFF) >>> 3;
+			isEmpty = (input[0] & IS_EMPTY) > 0;
+			//bit 4-8 is are part of the sequence number
+			sequenceNumber = (input[0] & 0xFF) >>> 4;
 
-			if (len > HEADER_LENGTH) {
+			if (len > HEADER_LENGTH && ! isEmpty) {
 				final int payloadLen = len - HEADER_LENGTH;
 				payload = new byte[payloadLen];
 				System.arraycopy(input, HEADER_LENGTH, payload, 0, payloadLen);
@@ -238,7 +245,7 @@ public class NfcMessage {
 		if (previousMessage == null) {
 			sequenceNumber = 0;
 		} else {
-			sequenceNumber = (previousMessage.sequenceNumber + 1) % 32;
+			sequenceNumber = (previousMessage.sequenceNumber + 1) % 16;
 		}
 		return this;
 	}
@@ -274,7 +281,7 @@ public class NfcMessage {
 		} else {
 			check = previousMessage.sequenceNumber;
 		}
-		return sequenceNumber == (check + 1) % 32;
+		return sequenceNumber == (check + 1) % 16;
 	}
 	
 	/**
@@ -367,10 +374,15 @@ public class NfcMessage {
 			return new byte[] { 0x00 };
 		}
 
-		final int len = payload.length;
+		//never have a size of 1, this is an NXP NFC hack.
+		final boolean isEmpty = payload.length == 0;
+		final int len = isEmpty ? 1 : payload.length;
 		final byte[] output = new byte[HEADER_LENGTH + len];
-		output[0] = (byte) ((type & 0x7) | ((sequenceNumber << 3) & 0xF8));
-		System.arraycopy(payload, 0, output, HEADER_LENGTH, len);
+		//add a flag to indicate that even though we have 1 byte payload its actually empty
+		output[0] = (byte) ((type & 0x7) | (isEmpty ? IS_EMPTY : 0) | ((sequenceNumber << 4) & 0xF0));
+		if(!isEmpty) {
+			System.arraycopy(payload, 0, output, HEADER_LENGTH, len);
+		}
 		return output;
 	}
 
@@ -384,7 +396,7 @@ public class NfcMessage {
 		}
 		final NfcMessage m = (NfcMessage) o;
 		return m.type == type 
-				&& (m.sequenceNumber % 32) == (sequenceNumber % 32) 
+				&& (m.sequenceNumber % 16) == (sequenceNumber % 16) 
 				&& Arrays.equals(m.payload, payload);
 	}
 
