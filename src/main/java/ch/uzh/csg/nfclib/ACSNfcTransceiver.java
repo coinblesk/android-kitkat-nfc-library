@@ -2,6 +2,10 @@ package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
 
+import com.acs.smartcard.Reader;
+import com.acs.smartcard.Reader.OnStateChangeListener;
+import com.acs.smartcard.ReaderException;
+
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -16,12 +20,7 @@ import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
 import ch.uzh.csg.comm.NfcLibException;
 import ch.uzh.csg.comm.NfcTransceiver;
-import ch.uzh.csg.comm.ReplyCallback;
 import ch.uzh.csg.comm.TagDiscoverHandler;
-
-import com.acs.smartcard.Reader;
-import com.acs.smartcard.Reader.OnStateChangeListener;
-import com.acs.smartcard.ReaderException;
 
 /**
  * This class handles the ACR122u USB NFC reader initialization and the message
@@ -54,6 +53,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 	private final IntentFilter filter;
 	
 	private final BroadcastReceiver broadcastReceiver;
+	
+	//hack, there is no way to chekc if a receiver is registered
+	private volatile boolean broadcastReceiverRegistered = false;
 
 	/**
 	 * Creates a new instance.
@@ -258,13 +260,20 @@ public class ACSNfcTransceiver implements NfcTrans {
 	}
 	
 	@Override
-	public void turnOn(Activity activity) throws NfcLibException {	
-		activity.registerReceiver(broadcastReceiver, filter);
+	public void turnOn(Activity activity) throws NfcLibException {
+		if(!broadcastReceiverRegistered) {
+			activity.registerReceiver(broadcastReceiver, filter);
+			broadcastReceiverRegistered = true;
+		}
 	}
 
 	@Override
 	public void turnOff(Activity activity) {
-		activity.unregisterReceiver(broadcastReceiver);
+		if(broadcastReceiverRegistered) {
+			activity.unregisterReceiver(broadcastReceiver);
+			broadcastReceiverRegistered = false;
+		}
+		
 	}
 
 }

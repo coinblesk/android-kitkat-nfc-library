@@ -14,7 +14,6 @@ import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
 import ch.uzh.csg.comm.NfcLibException;
 import ch.uzh.csg.comm.NfcTransceiver;
-import ch.uzh.csg.comm.ReplyCallback;
 import ch.uzh.csg.comm.TagDiscoverHandler;
 
 /**

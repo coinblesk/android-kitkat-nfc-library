@@ -10,7 +10,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.nfc.TagLostException;
 import android.util.Log;
 import ch.uzh.csg.comm.CommSetup;
 import ch.uzh.csg.comm.Config;
@@ -18,13 +17,13 @@ import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
 import ch.uzh.csg.comm.NfcLibException;
 import ch.uzh.csg.comm.NfcMessage;
+import ch.uzh.csg.comm.NfcMessage.Type;
 import ch.uzh.csg.comm.NfcMessageSplitter;
 import ch.uzh.csg.comm.NfcResponder;
 import ch.uzh.csg.comm.NfcResponseHandler;
 import ch.uzh.csg.comm.NfcTransceiver;
 import ch.uzh.csg.comm.TagDiscoverHandler;
 import ch.uzh.csg.comm.Utils;
-import ch.uzh.csg.comm.NfcMessage.Type;
 
 /**
  * This class represents the NFC party which initiates a NFC connection. It
