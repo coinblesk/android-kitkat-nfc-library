@@ -48,11 +48,15 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 	private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 	
-	private final Reader reader;
+	/*private final Reader reader;
 	
 	private final IntentFilter filter;
 	
-	private final BroadcastReceiver broadcastReceiver;
+	private final BroadcastReceiver broadcastReceiver;*/
+	
+	private final TagDiscoverHandler nfcInit;
+	private Reader reader;
+	private BroadcastReceiver broadcastReceiver;
 	
 	//hack, there is no way to chekc if a receiver is registered
 	private volatile boolean broadcastReceiverRegistered = false;
@@ -67,19 +71,17 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 *            a NFC connection is established (may not be null)
 	 * @throws NfcLibException 
 	 */
-	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit, final Activity activity) throws NfcLibException {
-		this.reader = createReader(activity);
-		this.filter = new IntentFilter();
-		filter.addAction(ACTION_USB_PERMISSION);
-		filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-		this.broadcastReceiver = createBroadcastReceiver(reader, nfcInit);
-		final ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
-		setOnStateChangedListener(reader, nfcInit, transceiver);
+	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit) throws NfcLibException {
+		this.nfcInit = nfcInit;
 		
 	}
 	
 	private static void setOnStateChangedListener(final Reader reader, 
 			final TagDiscoverHandler nfcInit, final ACSTransceiver transceiver) {
+		
+		if (Config.DEBUG) {
+			Log.d(TAG, "set listener");
+		}
 		
 		reader.setOnStateChangeListener(new OnStateChangeListener() {
 			public void onStateChange(int slotNum, int prevState, int currState) {
@@ -104,9 +106,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 	}
 	
 	public void shutdown() {
-		if (reader.isOpened()) {
-			reader.close();
-		}
+		
 	}
 	
 
@@ -224,19 +224,30 @@ public class ACSNfcTransceiver implements NfcTrans {
 		}
 	}
 	
-	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit) {
+	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit, final ACSTransceiver transceiver) {
 		return new BroadcastReceiver() {
 
 			@Override
 			public void onReceive(Context context, Intent intent) {
 				String action = intent.getAction();
+				
+				if(Config.DEBUG) {
+					Log.d(TAG, "actcion: "+ action);
+				}
 
 				if (ACTION_USB_PERMISSION.equals(action)) {
+					if(Config.DEBUG) {
+						Log.d(TAG, "try to create reader");
+					}
 					UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 					if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
 						if (device != null) {
 							try {
+								if(Config.DEBUG) {
+									Log.d(TAG, "reader open");
+								}
 								reader.open(device);
+								setOnStateChangedListener(reader, nfcInit, transceiver);
 							} catch (Exception e) {
 								nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 							}
@@ -247,6 +258,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 					if (device != null && device.equals(reader.getDevice())) {
 						reader.close();
+					}
+					if(Config.DEBUG) {
+						Log.d(TAG, "reader detached");
 					}
 				}
 			}
@@ -262,6 +276,17 @@ public class ACSNfcTransceiver implements NfcTrans {
 	@Override
 	public void turnOn(Activity activity) throws NfcLibException {
 		if(!broadcastReceiverRegistered) {
+			if(Config.DEBUG) {
+				Log.d(TAG, "turn on ACS");
+			}
+			
+			reader = createReader(activity);
+			IntentFilter filter = new IntentFilter();
+			filter.addAction(ACTION_USB_PERMISSION);
+			filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+			final ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
+			broadcastReceiver = createBroadcastReceiver(reader, nfcInit, transceiver);
+			
 			activity.registerReceiver(broadcastReceiver, filter);
 			broadcastReceiverRegistered = true;
 		}
@@ -270,8 +295,14 @@ public class ACSNfcTransceiver implements NfcTrans {
 	@Override
 	public void turnOff(Activity activity) {
 		if(broadcastReceiverRegistered) {
+			if(Config.DEBUG) {
+				Log.d(TAG, "Turn off ACS: " + broadcastReceiverRegistered);
+			}
 			activity.unregisterReceiver(broadcastReceiver);
 			broadcastReceiverRegistered = false;
+			if (reader != null && reader.isOpened()) {
+				reader.close();
+			}
 		}
 		
 	}

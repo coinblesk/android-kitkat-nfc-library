@@ -11,6 +11,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import android.app.Activity;
@@ -307,11 +308,23 @@ public class BTSetup implements CommSetup {
 	public void connect(Activity activity, BluetoothDevice device) {
 		
 		server.connect(device, false);
+		final AtomicInteger mtu = new AtomicInteger(1000);
 		BluetoothGatt bluetoothGatt = device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
 			
 			
 			BlockingQueue<byte[]> msg = new SynchronousQueue<>();
+			
+			@Override
+			public void onMtuChanged(BluetoothGatt gatt, int mtu2, int status) {
+				if(status != BluetoothGatt.GATT_SUCCESS) {
+					mtu.set(mtu.get() / 2);
+					gatt.requestMtu(mtu.get());
+				} else {
+					//continue
+				}
+				
+			}
 			
 			@Override
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
@@ -391,6 +404,7 @@ public class BTSetup implements CommSetup {
 
 			
 		});
+		bluetoothGatt.requestMtu(mtu.get());
 		
 	}
 	

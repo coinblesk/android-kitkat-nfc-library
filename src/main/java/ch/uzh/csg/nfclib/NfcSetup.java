@@ -116,9 +116,9 @@ public class NfcSetup implements CommSetup {
 	public NfcSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, final Activity activity) throws NfcLibException {
 		this.initiatorHandler = initiatorHandler;
 		if (hasClass("com.acs.smartcard.Reader") && ACSNfcTransceiver.isExternalReaderAttached(activity)) {
-			transceiver = new ACSNfcTransceiver(tagDiscoverHandler(activity), activity);
+			transceiver = new ACSNfcTransceiver(tagDiscoverHandler());
 		} else {
-			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler(activity), activity);
+			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler(), activity);
 		}
 		
 		final NfcResponder responder = new NfcResponder(responseHandler, transceiver.maxLen());
@@ -136,7 +136,7 @@ public class NfcSetup implements CommSetup {
 	 */
 	
 
-	protected TagDiscoverHandler tagDiscoverHandler(final Activity activity) {
+	protected TagDiscoverHandler tagDiscoverHandler() {
 		
 		return new TagDiscoverHandler() {
 			@Override
