@@ -12,7 +12,6 @@ public interface NfcTrans {
 	 * the init handshake is done). The {@link NfcTransceiver} has to be turned
 	 * on before enabling it.
 	 */
-	public void shutdown();
 
 	public int maxLen();
 	

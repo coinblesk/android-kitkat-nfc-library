@@ -105,10 +105,6 @@ public class ACSNfcTransceiver implements NfcTrans {
 		});
 	}
 	
-	public void shutdown() {
-		
-	}
-	
 
 	/**
 	 * Checks if the ACR122u USB NFC reader is attached via USB.
@@ -118,12 +114,12 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 *            devices
 	 * @return true if the ACR122u USB NFC reader is attached, false otherwise
 	 */
-	public static boolean isExternalReaderAttached(Activity activity) {
-		return externalReaderAttached(activity) != null;
+	public static boolean isExternalReaderAttached(Context context) {
+		return externalReaderAttached(context) != null;
 	}
 	
-	private static UsbDevice externalReaderAttached(Activity activity) {
-		UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+	private static UsbDevice externalReaderAttached(Context context) {
+		UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 		Reader reader = new Reader(manager);
 
 		for (UsbDevice device : manager.getDeviceList().values()) {

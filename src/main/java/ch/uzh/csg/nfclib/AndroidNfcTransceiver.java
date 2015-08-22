@@ -3,6 +3,7 @@ package ch.uzh.csg.nfclib;
 import java.io.IOException;
 
 import android.app.Activity;
+import android.content.Context;
 import android.nfc.NfcAdapter;
 import android.nfc.NfcAdapter.ReaderCallback;
 import android.nfc.Tag;
@@ -35,7 +36,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	private static final int MAX_WRITE_LENGTH = 245;
 	private final TagDiscoverHandler nfcInit;
 	private final NfcAdapter nfcAdapter;
-	private final Activity activity;
+	//private final Activity activity;
 	
 	/*
 	 * not sure if this is called from different threads. Make it volatile just
@@ -55,10 +56,10 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	 * @param executorService 
 	 * @throws NfcLibException 
 	 */
-	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, Activity activity) throws NfcLibException {
+	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, Context context) throws NfcLibException {
 		this.nfcInit = nfcInit;
-		this.activity = activity;
-		this.nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(activity);
+		//this.activity = activity;
+		this.nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(context);
 		//this.executorService = executorService;
 		if (nfcAdapter == null) {
 			throw new NfcLibException("NFC Adapter is null");
@@ -87,10 +88,6 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 			}
 			nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 		}
-	}
-	
-	public void shutdown() {
-		turnOff(activity);
 	}
 	
 	private static class AndroidTransceiver implements NfcTransceiver {

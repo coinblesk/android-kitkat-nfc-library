@@ -113,21 +113,28 @@ public class NfcSetup implements CommSetup {
 	 *            the identifier of this user (or this mobile device)
 	 * @throws NfcLibException 
 	 */
-	public NfcSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, final Activity activity) throws NfcLibException {
+	public NfcSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, final Context context) throws NfcLibException {
 		this.initiatorHandler = initiatorHandler;
-		if (hasClass("com.acs.smartcard.Reader") && ACSNfcTransceiver.isExternalReaderAttached(activity)) {
+		if (hasClass("com.acs.smartcard.Reader") && ACSNfcTransceiver.isExternalReaderAttached(context)) {
 			transceiver = new ACSNfcTransceiver(tagDiscoverHandler());
 		} else {
-			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler(), activity);
+			transceiver = new AndroidNfcTransceiver(tagDiscoverHandler(), context);
 		}
 		
 		final NfcResponder responder = new NfcResponder(responseHandler, transceiver.maxLen());
+		broadcastReceiver = new AppBroadcastReceiver(responder);
 		
+		
+	}
+	
+	public void enable(final Activity activity) {
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(HostApduServiceNfcLib.NFC_SERVICE_SEND_INTENT);
-		
-		broadcastReceiver = new AppBroadcastReceiver(responder);
 		activity.registerReceiver(broadcastReceiver, filter);
+	}
+	
+	public void disable(final Activity activity) {
+		activity.unregisterReceiver(broadcastReceiver);
 	}
 	
 	/**
