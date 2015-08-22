@@ -123,6 +123,8 @@ public class NfcMessage {
 	}
 
 	public static final byte[] READ_BINARY = { 0x00, (byte) 0xB0, 0x00, 0x00, 0x01 };
+	
+	private final static byte[] EMTPY_BYTE_ARRAY = new byte[0];
 
 	
 
@@ -137,7 +139,7 @@ public class NfcMessage {
 	// data
 	private final int type;
 	private int sequenceNumber = 0;
-	private byte[] payload = new byte[0];
+	private byte[] payload = EMTPY_BYTE_ARRAY;
 	private boolean first = false;
 	private boolean isEmpty = false;
 
