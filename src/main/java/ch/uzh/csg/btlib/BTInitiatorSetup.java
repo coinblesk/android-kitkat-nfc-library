@@ -50,7 +50,7 @@ import ch.uzh.csg.comm.NfcResponseHandler;
 import ch.uzh.csg.comm.NfcTransceiver;
 import ch.uzh.csg.nfclib.NfcInitiatorSetup;
 
-public class BTSetup {
+public class BTInitiatorSetup {
 	
 	final private static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	final private static AdvertiseData ADVERTISE_DATA = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(COINBLESK_SERVICE_UUID)).build();
@@ -75,7 +75,6 @@ public class BTSetup {
 	
 	
 	private final NfcInitiatorHandler initiatorHandler;
-	private final NfcResponder responder;
 	
 	//state
 	private final NfcMessageSplitter messageSplitter = new NfcMessageSplitter();
@@ -85,10 +84,9 @@ public class BTSetup {
 	// Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 1000000;
 	
-	public BTSetup(final NfcInitiatorHandler initiatorHandler, final NfcResponseHandler responseHandler, Activity activity) {
+	public BTInitiatorSetup(final NfcInitiatorHandler initiatorHandler,  Activity activity) {
 		messageSplitter.maxTransceiveLength(20);
 		this.initiatorHandler = initiatorHandler;
-		this.responder = new NfcResponder(responseHandler, 20);
 		// Use this check to determine whether BLE is supported on the device. Then
 		// you can selectively disable BLE-related features.
 		if (!activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
@@ -120,21 +118,6 @@ public class BTSetup {
 				System.err.println("send back1: "+Arrays.toString(response));
 				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
 			}
-			
-			@Override
-			public void onCharacteristicWriteRequest(final BluetoothDevice device,
-					final int requestId, BluetoothGattCharacteristic characteristic,
-					boolean preparedWrite, boolean responseNeeded, int offset,
-					byte[] value) {
-				if(Config.DEBUG) {
-					Log.d(TAG, "got request write: "+Arrays.toString(value));
-				}
-				
-				response = responder.processIncomingData(value);
-				System.err.println("send back2: "+Arrays.toString(response));
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
-			}
-			
 			
 			@Override
 			public void onConnectionStateChange(BluetoothDevice device,
@@ -305,6 +288,7 @@ public class BTSetup {
 	public void connect(Activity activity, BluetoothDevice device) {
 		
 		server.connect(device, false);
+
 		final AtomicInteger mtu = new AtomicInteger(1000);
 		BluetoothGatt bluetoothGatt = device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
