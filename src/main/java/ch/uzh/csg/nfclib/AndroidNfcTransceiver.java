@@ -33,10 +33,9 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	 * NXP chip supports max 255 bytes (problems might arise sometimes if
 	 * sending exactly 255 bytes)
 	 */
-	private static final int MAX_WRITE_LENGTH = 245;
+	public static final int MAX_WRITE_LENGTH = 245;
 	private final TagDiscoverHandler nfcInit;
 	private final NfcAdapter nfcAdapter;
-	//private final Activity activity;
 	
 	/*
 	 * not sure if this is called from different threads. Make it volatile just
@@ -62,11 +61,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		this.nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(context);
 		//this.executorService = executorService;
 		if (nfcAdapter == null) {
-			throw new NfcLibException("NFC Adapter is null");
-		}
-
-		if (!nfcAdapter.isEnabled()) {
-			throw new NfcLibException("NFC is not enabled");
+			throw new NfcLibException("NFC adapter is null, no NFC adapter is present");
 		}
 	}
 
@@ -158,7 +153,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	}
 
 	@Override
-	public void turnOn(Activity activity) throws NfcLibException {
+	public boolean turnOn(Activity activity) {
 		
 		if (Config.DEBUG) {
 			Log.d(TAG, "turn on device");
@@ -184,8 +179,9 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 			if (Config.DEBUG) {
 				Log.d(TAG, "could not turn on NFC, nfcAdapter is not enabled");
 			}
-			throw new NfcLibException("could not turn on NFC, nfcAdapter is not enabled");
+			return false;
 		}
+		return true;
 	}
 
 	@Override

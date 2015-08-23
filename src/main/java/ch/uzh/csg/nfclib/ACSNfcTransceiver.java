@@ -15,6 +15,7 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.util.Log;
+import android.util.Pair;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
@@ -48,6 +49,8 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 	private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 	
+	private static final ReaderOpenCallback callback = new ReaderOpenCallback();
+	
 	/*private final Reader reader;
 	
 	private final IntentFilter filter;
@@ -55,8 +58,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 	private final BroadcastReceiver broadcastReceiver;*/
 	
 	private final TagDiscoverHandler nfcInit;
-	private Reader reader;
+	
 	private BroadcastReceiver broadcastReceiver;
+	private Reader reader;
 	
 	//hack, there is no way to chekc if a receiver is registered
 	private volatile boolean broadcastReceiverRegistered = false;
@@ -71,9 +75,8 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 *            a NFC connection is established (may not be null)
 	 * @throws NfcLibException 
 	 */
-	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit) throws NfcLibException {
+	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit, final Context context) {
 		this.nfcInit = nfcInit;
-		
 	}
 	
 	private static void setOnStateChangedListener(final Reader reader, 
@@ -115,13 +118,12 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 * @return true if the ACR122u USB NFC reader is attached, false otherwise
 	 */
 	public static boolean isExternalReaderAttached(Context context) {
-		return externalReaderAttached(context) != null;
-	}
-	
-	private static UsbDevice externalReaderAttached(Context context) {
 		UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 		Reader reader = new Reader(manager);
-
+		return externalReaderAttached(context, manager, reader) != null;
+	}
+	
+	private static UsbDevice externalReaderAttached(Context context, UsbManager manager, Reader reader) {
 		for (UsbDevice device : manager.getDeviceList().values()) {
 			if (reader.isSupported(device)) {
 				return device;
@@ -130,18 +132,32 @@ public class ACSNfcTransceiver implements NfcTrans {
 		return null;
 	}
 	
-	public static Reader createReader(Activity activity) throws NfcLibException {
-		UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+	public static Pair<ACSTransceiver, Reader> createReaderAndTransceiver(final Context context, final ReaderOpenCallback callback, final TagDiscoverHandler nfcInit) throws NfcLibException {
+		UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 		Reader reader = new Reader(manager);
-
-		UsbDevice externalDevice = externalReaderAttached(activity);
+		UsbDevice externalDevice = externalReaderAttached(context, manager, reader);
 		if (externalDevice == null) {
 			throw new NfcLibException("External device is not set");
 		}
 
-		PendingIntent permissionIntent = PendingIntent.getBroadcast(activity, 0, new Intent(ACTION_USB_PERMISSION), 0);
-		manager.requestPermission(externalDevice, permissionIntent);
-		return reader;
+		//ask user for permission
+		if(Config.DEBUG) {
+			Log.d(TAG, "ask user for permission");
+		}
+		ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
+		try {
+			reader.open(externalDevice);
+			
+			callback.readerOpen(reader, externalDevice, transceiver);
+		} catch (Throwable t) {
+			if(Config.DEBUG) {
+				Log.d(TAG, "could not access device, ask for permission", t);
+			}
+			PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
+			manager.requestPermission(externalDevice, permissionIntent);	
+		}
+		
+		return new Pair<ACSTransceiver, Reader>(transceiver, reader);
 	}
 
 	
@@ -155,10 +171,8 @@ public class ACSNfcTransceiver implements NfcTrans {
 			this.reader = reader;
 			this.nfcInit = nfcInit;
 		}
-	
-		private void initCard() throws ReaderException {
-			reader.power(0, Reader.CARD_WARM_RESET);
-			reader.setProtocol(0, Reader.PROTOCOL_T0 | Reader.PROTOCOL_T1);
+		
+		private void disableBuzzer() throws ReaderException {
 			// Disable the standard buzzer when a tag is detected (Section 6.7). It sounds
 			// immediately after placing a tag resulting in people lifting the tag off before
 			// we've had a chance to read the ID.
@@ -168,6 +182,11 @@ public class ACSNfcTransceiver implements NfcTrans {
 			if(length != 8) {
 				nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 			}
+		}
+	
+		private void initCard() throws ReaderException {
+			reader.power(0, Reader.CARD_WARM_RESET);
+			reader.setProtocol(0, Reader.PROTOCOL_T0 | Reader.PROTOCOL_T1);
 		}
 		
 		
@@ -220,7 +239,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 		}
 	}
 	
-	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit, final ACSTransceiver transceiver) {
+	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit,  final ReaderOpenCallback callback, final ACSTransceiver transceiver) {
 		return new BroadcastReceiver() {
 
 			@Override
@@ -235,28 +254,32 @@ public class ACSNfcTransceiver implements NfcTrans {
 					if(Config.DEBUG) {
 						Log.d(TAG, "try to create reader");
 					}
-					UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-					if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-						if (device != null) {
-							try {
-								if(Config.DEBUG) {
-									Log.d(TAG, "reader open");
+					synchronized (this) {
+						UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+						if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+							if (device != null) {
+								try {
+									if(Config.DEBUG) {
+										Log.d(TAG, "reader open");
+									}
+									reader.open(device);
+									callback.readerOpen(reader, device, transceiver);
+								} catch (Exception e) {
+									nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 								}
-								reader.open(device);
-								setOnStateChangedListener(reader, nfcInit, transceiver);
-							} catch (Exception e) {
-								nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 							}
 						}
 					}
 				} else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-					UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+					synchronized (this) {
+						UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 
-					if (device != null && device.equals(reader.getDevice())) {
-						reader.close();
-					}
-					if(Config.DEBUG) {
-						Log.d(TAG, "reader detached");
+						if (device != null && device.equals(reader.getDevice())) {
+							reader.close();
+						}
+						if(Config.DEBUG) {
+							Log.d(TAG, "reader detached");
+						}
 					}
 				}
 			}
@@ -270,22 +293,33 @@ public class ACSNfcTransceiver implements NfcTrans {
 	}
 	
 	@Override
-	public void turnOn(Activity activity) throws NfcLibException {
+	public boolean turnOn(Activity activity) {
 		if(!broadcastReceiverRegistered) {
 			if(Config.DEBUG) {
 				Log.d(TAG, "turn on ACS");
 			}
 			
-			reader = createReader(activity);
+			
+			
+			final ACSTransceiver transceiver;
+			try {
+				Pair<ACSTransceiver, Reader> pair = createReaderAndTransceiver(activity, callback, nfcInit);
+				transceiver = pair.first;
+				reader = pair.second;
+			} catch (NfcLibException e) {
+				Log.e(TAG, "reader not available", e);
+				return false;
+			}
 			IntentFilter filter = new IntentFilter();
 			filter.addAction(ACTION_USB_PERMISSION);
 			filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-			final ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
-			broadcastReceiver = createBroadcastReceiver(reader, nfcInit, transceiver);
 			
+			broadcastReceiver = createBroadcastReceiver(reader, nfcInit, callback, transceiver);
+			setOnStateChangedListener(reader, nfcInit, transceiver);
 			activity.registerReceiver(broadcastReceiver, filter);
 			broadcastReceiverRegistered = true;
 		}
+		return true;
 	}
 
 	@Override
@@ -294,13 +328,27 @@ public class ACSNfcTransceiver implements NfcTrans {
 			if(Config.DEBUG) {
 				Log.d(TAG, "Turn off ACS: " + broadcastReceiverRegistered);
 			}
-			activity.unregisterReceiver(broadcastReceiver);
+			
 			broadcastReceiverRegistered = false;
 			if (reader != null && reader.isOpened()) {
 				reader.close();
+				reader = null;
+				if(Config.DEBUG) {
+					Log.d(TAG, "Reader closed");
+				}
+			}
+			activity.unregisterReceiver(broadcastReceiver);
+		}
+	}
+	
+	private static class ReaderOpenCallback  {
+		//@Override
+		public void readerOpen(Reader reader, UsbDevice externalDevice,  ACSTransceiver transceiver) {
+			try {
+				transceiver.disableBuzzer();
+			} catch (ReaderException e) {
+				Log.e(TAG, "could not initialize transceiver", e);
 			}
 		}
-		
-	}
-
+	};
 }

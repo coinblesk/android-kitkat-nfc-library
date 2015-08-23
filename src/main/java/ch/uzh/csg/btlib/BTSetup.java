@@ -6,13 +6,11 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -40,8 +38,8 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
 import android.widget.Toast;
-import ch.uzh.csg.comm.CommSetup;
 import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcInitiator;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
 import ch.uzh.csg.comm.NfcLibException;
 import ch.uzh.csg.comm.NfcMessage;
@@ -50,10 +48,9 @@ import ch.uzh.csg.comm.NfcMessageSplitter;
 import ch.uzh.csg.comm.NfcResponder;
 import ch.uzh.csg.comm.NfcResponseHandler;
 import ch.uzh.csg.comm.NfcTransceiver;
-import ch.uzh.csg.comm.ReplyCallback;
-import ch.uzh.csg.nfclib.NfcSetup;
+import ch.uzh.csg.nfclib.NfcInitiatorSetup;
 
-public class BTSetup implements CommSetup {
+public class BTSetup {
 	
 	final private static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	final private static AdvertiseData ADVERTISE_DATA = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(COINBLESK_SERVICE_UUID)).build();
@@ -216,7 +213,7 @@ public class BTSetup implements CommSetup {
 			byte[] response = transceiver.write(request.bytes());
 			
 			if (response == null) {
-				throw new IOException(NfcSetup.UNEXPECTED_ERROR);
+				throw new IOException(NfcInitiatorSetup.UNEXPECTED_ERROR);
 			}
 			NfcMessage responseMessage = new NfcMessage(response);
 			if (Config.DEBUG) {
@@ -228,11 +225,11 @@ public class BTSetup implements CommSetup {
 			initiatorHandler.handleStatus("message fragment sent, queue: "+messageQueue.size());
 				
 			
-			if (!NfcSetup.validateSequence(request, responseMessage)) {
+			if (!NfcInitiator.validateSequence(request, responseMessage)) {
 				if (Config.DEBUG) {
 					Log.e(TAG, "sequence error " + request + " / " + response);
 				}
-				throw new IOException(NfcSetup.INVALID_SEQUENCE);
+				throw new IOException(NfcInitiatorSetup.INVALID_SEQUENCE);
 			}
 				
 			lastMessageSent = request;
@@ -449,17 +446,17 @@ public class BTSetup implements CommSetup {
 
 	}
 
-	@Override
+	
 	public void stopInitiating(Activity test) {
 				
 	}
 
-	@Override
+	
 	public void shutdown(Activity test) {
 		server.close();
 	}
 
-	@Override
+	
 	public void startInitiating(Activity test) throws NfcLibException {
 		System.err.println("start scanning");
 		scanLeDevice(test);

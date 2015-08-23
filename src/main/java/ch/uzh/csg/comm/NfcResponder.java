@@ -8,10 +8,10 @@ import android.nfc.cardemulation.HostApduService;
 import android.util.Log;
 import ch.uzh.csg.comm.NfcMessage.Type;
 import ch.uzh.csg.nfclib.HostApduServiceNfcLib;
-import ch.uzh.csg.nfclib.NfcSetup;
+import ch.uzh.csg.nfclib.NfcInitiatorSetup;
 
 /**
- * This class represents the counterpart of the {@link NfcSetup}. It listens
+ * This class represents the counterpart of the {@link NfcInitiatorSetup}. It listens
  * for incoming NFC messages and provides the appropriate response.
  * 
  * Message fragmentation and reassembly is handled internally.
@@ -115,7 +115,7 @@ public class NfcResponder {
 							" / " + (lastMessageReceived == null ? -1 : lastMessageReceived.sequenceNumber()));
 				}
 				
-				responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
+				responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
 				outputMessage = new NfcMessage(Type.ERROR);
 				return prepareWrite(outputMessage);
 			}
@@ -177,7 +177,7 @@ public class NfcResponder {
 				Log.d(TAG, "nfc error reported - returning null");
 			}
 			reset();
-			responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
+			responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
 			return null;
 		}
 
@@ -210,7 +210,7 @@ public class NfcResponder {
 						Log.e(TAG, "nothing to return (get next fragment)");
 					}
 					reset();
-					responseHandler.handleFailed(NfcSetup.UNEXPECTED_ERROR);
+					responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
 					return new NfcMessage(Type.ERROR);
 				}
 				return messageQueue.poll();
@@ -297,6 +297,6 @@ public class NfcResponder {
 			Log.d(TAG, "deactivated due to " + 
 					(reason == HostApduService.DEACTIVATION_LINK_LOSS ? "link loss" : "deselected") + "(" + reason + ")");
 		}
-		responseHandler.handleFailed(NfcSetup.TIMEOUT);
+		responseHandler.handleFailed(NfcInitiatorSetup.TIMEOUT);
 	}	
 }
