@@ -46,7 +46,7 @@ public class BTInitiatorSetup {
 	
 	private final NfcInitiator initiator;
 	private final NfcInitiatorHandler initiatorHandler;
-	private final UUID remoteUUID;
+	
 	private final UUID localUUID;
 	
 	
@@ -54,7 +54,7 @@ public class BTInitiatorSetup {
 	// Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 1000000;
 	
-	public BTInitiatorSetup(final NfcInitiatorHandler initiatorHandler, Activity activity, UUID localUUID, UUID remoteUUID) {
+	public BTInitiatorSetup(final NfcInitiatorHandler initiatorHandler, final Activity activity, UUID localUUID) {
 		this.initiatorHandler = initiatorHandler;
 		this.initiator = new NfcInitiator(initiatorHandler);
 		// Use this check to determine whether BLE is supported on the device. Then
@@ -76,7 +76,6 @@ public class BTInitiatorSetup {
 		    activity.startActivityForResult(enableBtIntent, 1);
 		}
 		mHandler = new Handler();
-		this.remoteUUID = remoteUUID;
 		this.localUUID = localUUID;
 	}
 	
@@ -85,7 +84,7 @@ public class BTInitiatorSetup {
 		
 	}
 	
-	public void scanLeDevice(final Activity activity) {
+	public void scanLeDevice(final Activity activity, final UUID remoteUUID) {
 		if(Config.DEBUG) {
 			Log.d(TAG, "start scanning");
 		}
@@ -99,7 +98,7 @@ public class BTInitiatorSetup {
 					Log.d(TAG, "scan result2: " + result.getDevice());
 				}
 				sc.stopScan(this);
-				connect(activity, result.getDevice());
+				connect(activity, result.getDevice(), remoteUUID);
 			}
 
 			@Override
@@ -127,8 +126,8 @@ public class BTInitiatorSetup {
 	}
 	
 	
-	public void connect(Activity activity, BluetoothDevice device) {
-		final AtomicInteger mtu = new AtomicInteger(1024);
+	public void connect(Activity activity, BluetoothDevice device, final UUID remoteUUID) {
+		final AtomicInteger mtu = new AtomicInteger(512);
 		device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
 			BlockingQueue<byte[]> msg = new SynchronousQueue<>();

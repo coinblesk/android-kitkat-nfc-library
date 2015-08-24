@@ -128,7 +128,7 @@ public class BTResponderSetup {
 			@Override
 			public void onMtuChanged(BluetoothDevice device, int mtu) {
 				if(Config.DEBUG) {
-					Log.d(TAG, "MTU changed");
+					Log.d(TAG, "MTU changed to " + mtu);
 				}
 				responder = new NfcResponder(responseHandler, mtu);
 			}
