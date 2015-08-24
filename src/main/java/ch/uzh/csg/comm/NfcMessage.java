@@ -95,8 +95,8 @@ public class NfcMessage {
 		final byte Lc1 = (byte) AID_COINBLESK_1.length;
 		final byte Lc2 = (byte) AID_COINBLESK_2.length;
 		final byte Lc3 = (byte) AID_COINBLESK_3.length;
-		// we return 1 + 4 bytes
-		final byte Le = HEADER_LENGTH + 4;
+		// we return 1 + 2 bytes transmission length + 128bit UUID
+		final byte Le = HEADER_LENGTH + 2 + 16;
 		CLA_INS_P1_P2_COINBLESK_1 = new byte[] { CLA_INS_P1_P2[0], CLA_INS_P1_P2[1], 
 				CLA_INS_P1_P2[2], CLA_INS_P1_P2[3], Lc1, AID_COINBLESK_1[0], AID_COINBLESK_1[1], 
 				AID_COINBLESK_1[2], AID_COINBLESK_1[3], AID_COINBLESK_1[4], AID_COINBLESK_1[5], 
@@ -363,8 +363,8 @@ public class NfcMessage {
 	/**
 	 * Returns the bytes of this message (i.e., serializes it).
 	 */
-	@SuppressWarnings("incomplete-switch")
 	public byte[] bytes() {
+		
 		switch(type()) {
 		case AID_1: //no limit
 			return first ? CLA_INS_P1_P2_COINBLESK_1_FIRST : CLA_INS_P1_P2_COINBLESK_1;
@@ -374,18 +374,18 @@ public class NfcMessage {
 			return first ? CLA_INS_P1_P2_COINBLESK_3_FIRST : CLA_INS_P1_P2_COINBLESK_3;
 		case READ_BINARY:
 			return new byte[] { 0x00 };
+		default:
+			//never have a size of 1, this is an NXP NFC hack.
+			final boolean isEmpty = payload.length == 0;
+			final int len = isEmpty ? 1 : payload.length;
+			final byte[] output = new byte[HEADER_LENGTH + len];
+			//add a flag to indicate that even though we have 1 byte payload its actually empty
+			output[0] = (byte) ((type & 0x7) | (isEmpty ? IS_EMPTY : 0) | ((sequenceNumber << 4) & 0xF0));
+			if(!isEmpty) {
+				System.arraycopy(payload, 0, output, HEADER_LENGTH, len);
+			}
+			return output;	
 		}
-
-		//never have a size of 1, this is an NXP NFC hack.
-		final boolean isEmpty = payload.length == 0;
-		final int len = isEmpty ? 1 : payload.length;
-		final byte[] output = new byte[HEADER_LENGTH + len];
-		//add a flag to indicate that even though we have 1 byte payload its actually empty
-		output[0] = (byte) ((type & 0x7) | (isEmpty ? IS_EMPTY : 0) | ((sequenceNumber << 4) & 0xF0));
-		if(!isEmpty) {
-			System.arraycopy(payload, 0, output, HEADER_LENGTH, len);
-		}
-		return output;
 	}
 
 	@Override

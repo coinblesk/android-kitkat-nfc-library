@@ -31,4 +31,6 @@ public interface NfcResponseHandler {
 	 */
 	public void handleStatus(String message);
 
+	public abstract byte[] getUUID();
+
 }

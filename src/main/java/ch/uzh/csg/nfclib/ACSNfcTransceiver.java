@@ -94,7 +94,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 				if (currState == Reader.CARD_PRESENT) {				
 					try {					
 						transceiver.initCard();
-						nfcInit.tagDiscovered(transceiver);
+						nfcInit.tagDiscovered(transceiver, true, true, true);
 					} catch (ReaderException e) {
 						if (Config.DEBUG) {
 							Log.e(TAG, "Could not connnect reader (ReaderException): ", e);

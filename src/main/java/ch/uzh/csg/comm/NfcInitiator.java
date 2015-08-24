@@ -30,28 +30,33 @@ public class NfcInitiator {
 
 		return new TagDiscoverHandler() {
 			@Override
-			public void tagDiscovered(final NfcTransceiver nfcTransceiver) {
+			public void tagDiscovered(final NfcTransceiver nfcTransceiver, boolean handshake, boolean polling, boolean continueNFC) {
 				if (Config.DEBUG) {
 					Log.d(TAG, "Tag detected!");
 				}
-				try {
+				try {			
 					if (!initiating) {
 						if (Config.DEBUG) {
-							Log.d(TAG, "Nothing to do shutdown!");
+							Log.d(TAG, "Nothing to do shutdown 1!");
 						}
 						nfcTransceiver.close();
 						return;
 					}
-					try {
-						handshake(nfcTransceiver);
-					} catch (IOException e) {
-						initiatorHandler.handleFailed(e.toString());
-						return;
+					if(handshake) {
+						try {
+							handshake(nfcTransceiver);
+						} catch (IOException e) {
+							initiatorHandler.handleFailed(e.toString());
+							return;
+						}
 					}
 					initiatorHandler.handleStatus("handshake complete");
 					// check if we should resume
 					if (!messageQueue.isEmpty()) {
 						if (!processMessage(nfcTransceiver)) {
+							if (Config.DEBUG) {
+								Log.d(TAG, "Nothing to do shutdown 2!");
+							}
 							return;
 						}
 					}
@@ -60,7 +65,16 @@ public class NfcInitiator {
 						byte[] message = initiatorHandler.nextMessage();
 						if (message == null) {
 							// start polling
-							messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
+							if(polling) {
+								if (Config.DEBUG) {
+									Log.d(TAG, "Start polling");
+								}
+								messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
+							} else {
+								if (Config.DEBUG) {
+									Log.d(TAG, "Nothing to do shutdown 3!");
+								}
+							}
 						} else {
 
 							// split it
@@ -73,6 +87,14 @@ public class NfcInitiator {
 							return;
 						}
 
+					}
+					
+					if(Config.DEBUG) {
+						Log.d(TAG, "loop done");
+					}
+					
+					if(!continueNFC) {
+						return;
 					}
 
 					// we are complete
@@ -173,7 +195,7 @@ public class NfcInitiator {
 		};
 	}
 
-	private boolean processMessage(NfcTransceiver transceiver) {
+	public boolean processMessage(NfcTransceiver transceiver) {
 		try {
 			messageLoop(transceiver);
 		} catch (NfcLibException e) {
@@ -246,14 +268,21 @@ public class NfcInitiator {
 			}
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
-		if (responseMessage.payload().length != 4) {
+		if (responseMessage.payload().length != 2 + 16) {
 			if (Config.DEBUG) {
 				Log.e(TAG, "handshake payload unexpected: " + responseMessage);
 			}
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
-		final int maxLenOther = Utils.byteArrayToInt(responseMessage.payload(), 0);
+		final int maxLenOther = Utils.byteArrayToShort(responseMessage.payload(), 0);
+		byte[] uuid = new byte[16];
+		System.arraycopy(responseMessage.payload(), 2, uuid, 0, 16);
+		initiatorHandler.setUUID(uuid);
 		messageSplitter.maxTransceiveLength(Math.min(maxLenOther, maxLenThis));
+	}
+	
+	public void setmaxTransceiveLength(int len) {
+		messageSplitter.maxTransceiveLength(len);
 	}
 
 	private void messageLoop(NfcTransceiver transceiver) throws Exception {

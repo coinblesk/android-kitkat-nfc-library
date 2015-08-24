@@ -67,7 +67,8 @@ public class NfcResponder {
 		}
 		
 		
-		byte[] intVal;
+		byte[] array;
+		byte[] merged;
 		int maxLen;
 		switch(inputMessage.type()) {
 		case READ_BINARY:
@@ -80,26 +81,29 @@ public class NfcResponder {
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID1 selected");
 			}
-			maxLen = Math.min(Integer.MAX_VALUE, maxTransceiveLength);
+			maxLen = Math.min(Short.MAX_VALUE, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
-			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
+			array = Utils.shortToByteArray((short)maxLen);
+			merged = Utils.merge(array, responseHandler.getUUID());
+			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		case AID_2:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID2 selected");
 			}
 			maxLen = Math.min(53, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
-			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
+			array = Utils.shortToByteArray((short)maxLen);
+			merged = Utils.merge(array, responseHandler.getUUID());
+			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		case AID_3:
 			if (Config.DEBUG) {
 				Log.d(TAG, "AID3 selected");
 			}
 			maxLen = Math.min(245, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
-			intVal = Utils.intToByteArray(maxLen);
-			return new NfcMessage(Type.SINGLE).payload(intVal).bytes();
+			array = Utils.shortToByteArray((short)maxLen);
+			merged = Utils.merge(array, responseHandler.getUUID());
+			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		default:
 			if (Config.DEBUG) {
 				Log.d(TAG, "process regular message " + inputMessage);

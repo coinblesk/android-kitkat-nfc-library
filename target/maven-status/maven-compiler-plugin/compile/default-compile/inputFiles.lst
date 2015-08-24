@@ -4,14 +4,15 @@
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/nfclib/HostApduServiceNfcLib.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/TagDiscoverHandler.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/nfclib/ACSNfcTransceiver.java
+/home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/btlib/BTResponderSetup.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcMessageSplitter.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/ResponseLater.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/ReplyCallback.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/nfclib/NfcResponderSetup.java
-/home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/btlib/BTSetup.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcMessage.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcResponder.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcResponseHandler.java
+/home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/btlib/BTInitiatorSetup.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcInitiator.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/NfcLibException.java
 /home/draft/git/android-kitkat-nfc-library2/src/main/java/ch/uzh/csg/comm/Config.java

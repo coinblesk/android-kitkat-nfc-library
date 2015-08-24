@@ -33,4 +33,6 @@ public interface NfcInitiatorHandler {
 
 	public abstract byte[] nextMessage() throws Exception;
 
+	public abstract void setUUID(byte[] uuid);
+
 }

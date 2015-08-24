@@ -8,7 +8,7 @@ package ch.uzh.csg.comm;
  */
 public interface TagDiscoverHandler {
 	
-	public void tagDiscovered(NfcTransceiver nfcTransceiver);
+	public void tagDiscovered(NfcTransceiver nfcTransceiver, boolean handshake, boolean polling, boolean continueNFC);
 
 	public void tagFailed(String message);
 

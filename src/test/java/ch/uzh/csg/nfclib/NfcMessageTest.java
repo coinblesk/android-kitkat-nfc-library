@@ -94,6 +94,16 @@ public class NfcMessageTest {
 		Assert.assertEquals(0, m2.payload().length);
 	}
 	
+	@Test
+	public void testHeader8() {
+		NfcMessage m1 = new NfcMessage(Type.AID_1);
+		m1.sequenceNumber(16);
+		m1.payload(new byte[0]);
+		byte[] transfer = m1.bytes();
+		//66 + header
+		Assert.assertEquals(19, transfer[transfer.length - 1 ]);
+	}
+	
 	
 
 }

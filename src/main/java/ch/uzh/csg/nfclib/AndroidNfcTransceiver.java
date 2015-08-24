@@ -76,7 +76,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		try {
 			isoDep.connect();
 			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter, nfcInit);
-			nfcInit.tagDiscovered(transceiver);
+			nfcInit.tagDiscovered(transceiver, true, true, true);
 		} catch (IOException e) {
 			if (Config.DEBUG) {
 				Log.e(TAG, "Could not connnect isodep: ", e);
