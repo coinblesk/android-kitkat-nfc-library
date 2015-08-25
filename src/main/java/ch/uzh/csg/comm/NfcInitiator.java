@@ -27,6 +27,10 @@ public class NfcInitiator {
 	public NfcInitiator(NfcInitiatorHandler initiatorHandler) {
 		this.initiatorHandler = initiatorHandler;
 	}
+	
+	public NfcInitiatorHandler getInitiatorHandler() {
+		return initiatorHandler;
+	}
 
 	public TagDiscoverHandler tagDiscoverHandler() {
 
@@ -165,7 +169,6 @@ public class NfcInitiator {
 						if (Config.DEBUG) {
 							LOGGER.debug( "loop done");
 						}
-						reset();
 					}
 
 				} catch (Throwable t) {
@@ -199,7 +202,6 @@ public class NfcInitiator {
 			return false;
 		} catch (Throwable t) {
 			t.printStackTrace();
-			reset();
 			initiatorHandler.handleFailed(t.toString());
 			return false;
 		}
@@ -243,6 +245,7 @@ public class NfcInitiator {
 		if (first) {
 			initMessage.first();
 			first = false;
+			reset();
 		}
 
 		// no sequence number here,initiating.set( as this is a special message

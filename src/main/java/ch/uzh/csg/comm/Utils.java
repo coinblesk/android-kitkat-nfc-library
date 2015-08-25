@@ -87,13 +87,19 @@ final public class Utils {
 		return combined;
 	}
 	
-	public static UUID hashToUUID(final byte[] data) {
+	public static UUID hashToUUID(final byte[] data, final byte[] macAddress) {
 	    try {
 			final MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
 		    final byte[] hash = sha256.digest(data);
 		    for(int i=0;i<16;i++) {
 		    	hash[i]^= hash[i+16];
 		    }
+		    
+		    //overwrite with macaddress
+		    for(int i=0;i<6;i++) {
+		    	hash[i] = macAddress[i];
+		    }
+		    
 		    final long most = byteArrayToLong(hash, 0);
 		    final long least = byteArrayToLong(hash, 8);
 	    
@@ -102,7 +108,6 @@ final public class Utils {
 		} catch (NoSuchAlgorithmException e) {
 			throw new RuntimeException("sha-256 not present?", e);
 		} 
-	    
 	}
 
 	public static short byteArrayToShort(byte[] array, int offset) {

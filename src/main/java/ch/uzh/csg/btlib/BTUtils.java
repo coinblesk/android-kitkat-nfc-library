@@ -27,4 +27,19 @@ public class BTUtils {
 		}
 		return new Pair<BluetoothManager, BluetoothAdapter>(bluetoothManager, bluetoothAdapter);
     }
+	
+	public static byte[] btAddress(BluetoothAdapter adapter) {
+		String macAddress = adapter.getAddress();
+		String[] macAddressParts = macAddress.split(":");
+
+		// convert hex string to byte values
+		byte[] macAddressBytes = new byte[6];
+		for(int i=0; i<6; i++){
+		    int hex = Integer.parseInt(macAddressParts[i], 16);
+		    macAddressBytes[i] = (byte) hex;
+		}
+		return macAddressBytes;
+	}
+	
+	
 }

@@ -46,7 +46,8 @@ public class NfcResponderSetup  {
 	public static final String INVALID_SEQUENCE = "Invalid sequence";
 	public static final String TIMEOUT = "Timeout";
 
-	private final AppBroadcastReceiver broadcastReceiver;
+	final private AppBroadcastReceiver broadcastReceiver;
+	final private NfcResponder responder;
 
 	final public class AppBroadcastReceiver extends BroadcastReceiver {
 		
@@ -93,8 +94,12 @@ public class NfcResponderSetup  {
 	 * @throws NfcLibException 
 	 */
 	public NfcResponderSetup(final NfcResponseHandler responseHandler) {
-		final NfcResponder responder = new NfcResponder(responseHandler, AndroidNfcTransceiver.MAX_WRITE_LENGTH);
+		responder = new NfcResponder(responseHandler, AndroidNfcTransceiver.MAX_WRITE_LENGTH);
 		broadcastReceiver = new AppBroadcastReceiver(responder);
+	}
+	
+	public NfcResponder getNfcResponder() {
+		return responder;
 	}
 	
 	public void enable(final Activity activity) {

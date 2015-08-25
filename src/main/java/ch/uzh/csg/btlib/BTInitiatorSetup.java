@@ -1,5 +1,6 @@
 package ch.uzh.csg.btlib;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,6 +19,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -41,32 +43,38 @@ public class BTInitiatorSetup {
 	final private BluetoothAdapter bluetoothAdapter;
 	final private NfcInitiator initiator;
 	final private NfcInitiatorHandler initiatorHandler;
-	final private UUID localUUID;
+	//final private UUID localUUID;
 	
 	
     
     private static BTInitiatorSetup instance = null;
     
-    public static BTInitiatorSetup init(final NfcInitiatorHandler initiatorHandler, 
-    		final Activity activity, UUID localUUID, BluetoothAdapter bluetoothAdapter) {
+    public static BTInitiatorSetup init(final NfcInitiator initiator, 
+    		final Activity activity,  BluetoothAdapter bluetoothAdapter) {
     	if(instance == null) {
-    		instance = new BTInitiatorSetup(initiatorHandler, localUUID, bluetoothAdapter);
+    		instance = new BTInitiatorSetup(initiator, bluetoothAdapter);
     	}
     	return instance;
     }
 	
-	private BTInitiatorSetup(final NfcInitiatorHandler initiatorHandler, UUID localUUID, BluetoothAdapter bluetoothAdapter) {
-		this.initiatorHandler = initiatorHandler;
-		this.initiator = new NfcInitiator(initiatorHandler);
+	private BTInitiatorSetup(final NfcInitiator initiator, BluetoothAdapter bluetoothAdapter) {
+		this.initiatorHandler = initiator.getInitiatorHandler();
+		this.initiator = initiator;
 		this.bluetoothAdapter = bluetoothAdapter;
 		this.mHandler = new Handler();
-		this.localUUID = localUUID;
+	}
+	
+	public BluetoothDevice getRemoteDevice(byte[] macAdress) {
+		return bluetoothAdapter.getRemoteDevice(macAdress);
 	}
 	
 	private void btleDiscovered(final NfcTransceiver nfcTransceiver) throws Exception {
 		initiatorHandler.btleDiscovered(new BTLEController() {
 			@Override
 			public void startBTLE() {
+				if(Config.DEBUG) {
+					LOGGER.debug( "start BT");
+				}
 				initiator.tagDiscoverHandler().tagDiscovered(nfcTransceiver, false, false);
 			}
 		});
@@ -120,7 +128,8 @@ public class BTInitiatorSetup {
 		final AtomicInteger mtu = new AtomicInteger(517);
 		device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
-			BlockingQueue<byte[]> msg = new SynchronousQueue<>();
+			private BlockingQueue<byte[]> msg = new SynchronousQueue<>();
+			private BluetoothGattCharacteristic car = null;
 			
 			@Override
 			public void onMtuChanged(BluetoothGatt gatt, int mtu2, int status) {
@@ -145,7 +154,6 @@ public class BTInitiatorSetup {
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
 					int newState) {
 				if (newState == BluetoothGatt.STATE_CONNECTED) {
-					gatt.setCharacteristicNotification(BTInitiatorSetup.this.getIndicateAddress(), true);
 					tryRequestMtu(gatt, 10, mtu.get(), 100);
 			    }
 			}
@@ -180,15 +188,26 @@ public class BTInitiatorSetup {
 				if(Config.DEBUG) {
 					LOGGER.debug( "device discovered");
 				}
+				
 				if (status == BluetoothGatt.GATT_SUCCESS) {
 					if(Config.DEBUG) {
 						LOGGER.debug( "service: {}", gatt.getServices());
 					}
 					
 					final BluetoothGattService ser = gatt.getService(BTResponderSetup.COINBLESK_SERVICE_UUID);
-					final BluetoothGattCharacteristic car = ser.getCharacteristic(remoteUUID);
+					car = ser.getCharacteristic(remoteUUID);
+					//enable indication, see
+					//http://stackoverflow.com/questions/27068673/subscribe-to-a-ble-gatt-notification-android
+					//http://developer.android.com/guide/topics/connectivity/bluetooth-le.html#notification
+					/*gatt.setCharacteristicNotification(car, true);
+					UUID uuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+					BluetoothGattDescriptor descriptor = car.getDescriptor(uuid);
+					descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+					boolean retVal = gatt.writeDescriptor(descriptor);
+					if(Config.DEBUG) {
+						LOGGER.debug( "enable indication: {}", retVal);
+					}*/
 					
-					//car.setValue(NfcMessage.BTLE_INIT);
 					new Thread(new Runnable() {
 						
 						@Override
@@ -198,11 +217,26 @@ public class BTInitiatorSetup {
 								
 								@Override
 								public byte[] write(byte[] input) throws Exception {
-									car.setValue(input);
-									boolean retVal = gatt.writeCharacteristic(car);
-									if(Config.DEBUG) {
-										LOGGER.debug( "wrote characteristic: {}", retVal);
+									if(car == null) {
+										throw new IOException("Characteristic is null");
 									}
+									car.setValue(input);
+									for(int i=0;i<10;i++) {
+										if(gatt.writeCharacteristic(car)) {
+											if(Config.DEBUG) {
+												LOGGER.debug( "wrote characteristic: success");
+												//boolean retVal = gatt.readCharacteristic(car);
+												//LOGGER.debug( "read characteristic: {}", retVal);
+											}
+											break;
+										} else {
+											if(Config.DEBUG) {
+												LOGGER.debug( "wrote characteristic: failed");
+											}
+											Thread.sleep(100);
+										}
+									}
+				
 									return msg.poll(10, TimeUnit.SECONDS);
 								}
 								
@@ -223,23 +257,37 @@ public class BTInitiatorSetup {
 							
 						}
 					}).start();
-				}			       
+					
+				} else {		       
+					car = null;
+				}
 			}
 			
-			/*@Override
+			@Override
+			public void onDescriptorWrite(final BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+				if(Config.DEBUG) {
+					LOGGER.debug( "subscribtion request done: {}", status);
+				}
+				//car.setValue(NfcMessage.BTLE_INIT);
+				
+			}
+			
+			@Override
 			public void onCharacteristicWrite(BluetoothGatt gatt,
 					BluetoothGattCharacteristic characteristic, int status) {
-				System.err.println("here3 "+characteristic.getValue().length);
-				final BluetoothGattService ser = gatt.getService(BTResponderSetup.COINBLESK_SERVICE_UUID);
-				final BluetoothGattCharacteristic car = ser.getCharacteristic(remoteUUID);				
+				if(Config.DEBUG) {
+					LOGGER.debug( "characteristic request done: {}", status);
+				}				
+				boolean retVal = gatt.readCharacteristic(car);
+				LOGGER.debug( "read characteristic: {}", retVal);
 				
-			}*/
-			/*@Override
+			}
+			@Override
 			public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
 					int status) {
 				System.err.println("here4 "+characteristic.getValue().length);
 				msg.offer(characteristic.getValue());
-			}*/
+			}
 			
 			@Override
 			public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
@@ -247,15 +295,15 @@ public class BTInitiatorSetup {
 					LOGGER.debug( "got reply back characteristic: {}", Arrays.toString(characteristic.getValue()));
 				}
 				msg.offer(characteristic.getValue());
-			}	
+			}
 		});
 	}
 	
-	public BluetoothGattCharacteristic getIndicateAddress() {
+	/*public BluetoothGattCharacteristic getIndicateAddress() {
 		final BluetoothGattCharacteristic characteristicIndicate =
 		        new BluetoothGattCharacteristic(localUUID,
 		                BluetoothGattCharacteristic.PROPERTY_INDICATE | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
 		                BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ);
 		return characteristicIndicate;
-	}
+	}*/
 }

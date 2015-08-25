@@ -67,6 +67,10 @@ public class NfcInitiatorSetup {
 		}
 	}
 	
+	public NfcInitiator getNfcInitiator() {
+		return initiator;
+	}
+	
 	/**
 	 * This class initializes the {@link NfcInitiatorSetup} as soon as a NFC tag has
 	 * been discovered.

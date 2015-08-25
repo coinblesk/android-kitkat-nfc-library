@@ -242,15 +242,19 @@ public class NfcResponder {
 			return new NfcMessage(Type.ERROR);
 		}
 	}
-
-	private NfcMessage response(final byte[] payload) throws Exception {
-		final byte[] response = responseHandler.handleMessageReceived(payload, new ResponseLater(){
+	
+	public ResponseLater lateResponder() {
+		return new ResponseLater(){
 			@Override
 			public void response(byte[] data) {
 				synchronized (lock) {
 					lateMessage = fragmentData(data);
 				}
-			}});
+			}};
+	}
+
+	private NfcMessage response(final byte[] payload) throws Exception {
+		final byte[] response = responseHandler.handleMessageReceived(payload, lateResponder());
 		
 		// the user can decide to use sendLater. In that case, we'll start
 		// to poll. This is triggered by returning null.
@@ -295,5 +299,10 @@ public class NfcResponder {
 					(reason == HostApduService.DEACTIVATION_LINK_LOSS ? "link loss" : "deselected"), reason);
 		}
 		responseHandler.handleFailed(NfcInitiatorSetup.TIMEOUT);
+	}
+
+	public void setMtu(int mtu) {
+		messageSplitter.maxTransceiveLength(mtu);
+		
 	}	
 }

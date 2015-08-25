@@ -2,7 +2,8 @@ package ch.uzh.csg.btlib;
 
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,6 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.os.ParcelUuid;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcResponder;
-import ch.uzh.csg.comm.NfcResponseHandler;
 
 public class BTResponderSetup {
 	
@@ -31,7 +31,6 @@ public class BTResponderSetup {
 	
 	final public static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	
-	//private static final UUID COINBLESK_REPLY = UUID.fromString("1ac500ae-ce41-4e2b-a54a-05c8b6a78e35");
 	private final UUID localUUID;
 	
 	final private static AdvertiseData ADVERTISE_DATA = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(COINBLESK_SERVICE_UUID)).build();
@@ -51,9 +50,9 @@ public class BTResponderSetup {
 	
 	final private BluetoothAdapter bluetoothAdapter;
 	final private BluetoothManager bluetoothManager;
-	final private AtomicReference<BluetoothGattCharacteristic> remoteUUIDref = new AtomicReference<>();
+	//final private AtomicReference<BluetoothGattCharacteristic> remoteUUIDref = new AtomicReference<>();
 	
-	 private static BTResponderSetup instance = null;
+	private static BTResponderSetup instance = null;
 	
 	public static BTResponderSetup init(UUID localUUID, BluetoothManager bluetoothManager, 
     		BluetoothAdapter bluetoothAdapter) {
@@ -74,19 +73,25 @@ public class BTResponderSetup {
 	}
 	
 	
-	public void advertise(final NfcResponseHandler responseHandler, final Activity activity) {
+	public void advertise(final NfcResponder responder, final Activity activity) {
 		server = bluetoothManager.openGattServer(activity, new BluetoothGattServerCallback() {
 			
-			private byte[] response = null;
-			private NfcResponder responder = new NfcResponder(responseHandler, 20);
+			final private BlockingQueue<byte[]> queue = new ArrayBlockingQueue<byte[]>(1);  
 			
 			@Override
 			public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset,
 					BluetoothGattCharacteristic characteristic) {
-				if(Config.DEBUG) {
-					LOGGER.debug( "got request read, send back: {}", Arrays.toString(response));
+				try {
+					byte[] response = queue.take();
+					if(Config.DEBUG) {
+						LOGGER.debug( "got request read, send back: {}", response);
+					}
+					server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
+				} catch (InterruptedException e) {
+					LOGGER.error("interrupted: ", e);
+					server.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, new byte[0]);
 				}
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
+				
 			}
 			
 			@Override
@@ -98,27 +103,14 @@ public class BTResponderSetup {
 					LOGGER.debug( "got request write: {}", Arrays.toString(value));
 				}
 				
-				byte[] response = responder.processIncomingData(value);
+				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
+				
+				final byte[] response = responder.processIncomingData(value);
+				
+				queue.offer(response);
+				
 				if(Config.DEBUG) {
 					LOGGER.debug( "send back: {}", Arrays.toString(response));
-				}
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
-				
-				
-				if(remoteUUIDref.get() != null) {
-					BluetoothGattCharacteristic characteristicReply = remoteUUIDref.get();
-					if(Config.DEBUG) {
-						LOGGER.debug( "we have a server reply addrress: {}", characteristicReply.toString());
-					}
-					characteristicReply.setValue(response);
-					boolean retVal = server.notifyCharacteristicChanged(device, characteristicReply, true);
-					if(Config.DEBUG) {
-						LOGGER.debug( "sent reply: {}", retVal);
-					}
-				} else {
-					if(Config.DEBUG) {
-						LOGGER.debug( "no server reply addrress");
-					}
 				}
 			}
 			
@@ -127,7 +119,7 @@ public class BTResponderSetup {
 				if(Config.DEBUG) {
 					LOGGER.debug( "MTU changed to {}", mtu);
 				}
-				responder = new NfcResponder(responseHandler, mtu);
+				responder.setMtu(mtu); 
 			}
 			
 			
@@ -143,7 +135,8 @@ public class BTResponderSetup {
 		BluetoothGattService service = new BluetoothGattService(COINBLESK_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 	    
 		BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
-				localUUID, BluetoothGattCharacteristic.PROPERTY_WRITE, BluetoothGattCharacteristic.PERMISSION_WRITE);
+				localUUID, BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ ,
+				BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ);
 	    service.addCharacteristic(characteristic);
 		server.addService(service);
 		
@@ -151,16 +144,12 @@ public class BTResponderSetup {
 		
 	}
 	
-	public void setRemoteUUID(UUID remoteUUID) {
-		final BluetoothGattCharacteristic characteristicReply =
-		        new BluetoothGattCharacteristic(remoteUUID,
-		                BluetoothGattCharacteristic.PROPERTY_INDICATE,
-		                BluetoothGattCharacteristic.PERMISSION_WRITE);
-		remoteUUIDref.set(characteristicReply);
-	}
-	
 	public void stopAdvertise() {
 		stopLeAdvertising(bluetoothAdapter);
+	}
+	
+	public UUID getLocalUUID() {
+		return localUUID;
 	}
 	
 	private static boolean startLeAdvertising(BluetoothAdapter bluetoothAdapter) {
