@@ -1,4 +1,5 @@
 ch/uzh/csg/nfclib/ACSNfcTransceiver$1.class
+ch/uzh/csg/btlib/BTInitiatorSetup$4$2.class
 ch/uzh/csg/nfclib/AndroidNfcTransceiver.class
 ch/uzh/csg/comm/ReplyCallback.class
 ch/uzh/csg/comm/TagDiscoverHandler.class
@@ -16,10 +17,11 @@ ch/uzh/csg/comm/NfcMessage$Type.class
 ch/uzh/csg/nfclib/ACSNfcTransceiver$2.class
 ch/uzh/csg/nfclib/NfcTrans.class
 ch/uzh/csg/nfclib/ACSNfcTransceiver.class
+ch/uzh/csg/btlib/BTInitiatorSetup$4.class
+ch/uzh/csg/btlib/BTInitiatorSetup$4$1.class
 ch/uzh/csg/comm/NfcResponder.class
-ch/uzh/csg/btlib/BTInitiatorSetup$3$1$1.class
-ch/uzh/csg/nfclib/ACSNfcTransceiver$ReaderOpenCallback.class
 ch/uzh/csg/btlib/BTInitiatorSetup$1.class
+ch/uzh/csg/btlib/BTUtils.class
 ch/uzh/csg/comm/NfcInitiator$1.class
 ch/uzh/csg/comm/NfcInitiatorHandler.class
 ch/uzh/csg/btlib/BTResponderSetup$2.class
@@ -35,9 +37,10 @@ ch/uzh/csg/btlib/BTInitiatorSetup.class
 ch/uzh/csg/comm/Config.class
 ch/uzh/csg/comm/NfcMessage.class
 ch/uzh/csg/comm/NfcMessage$1.class
+ch/uzh/csg/btlib/BTLEController.class
+ch/uzh/csg/btlib/BTInitiatorSetup$4$2$1.class
 ch/uzh/csg/nfclib/AndroidNfcTransceiver$1.class
 ch/uzh/csg/comm/Utils.class
 ch/uzh/csg/comm/NfcResponder$1.class
-ch/uzh/csg/btlib/BTInitiatorSetup$3$1.class
 ch/uzh/csg/comm/NfcEvent.class
 ch/uzh/csg/nfclib/HostApduServiceNfcLib.class

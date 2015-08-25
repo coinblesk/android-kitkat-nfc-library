@@ -5,12 +5,14 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-import android.util.Log;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import ch.uzh.csg.comm.NfcMessage.Type;
 
 public class NfcInitiator {
 	
-	private static final String TAG = "ch.uzh.csg.nfclib.NfcInitiator";
+	private static final Logger LOGGER = LoggerFactory.getLogger(NfcInitiator.class);
 
 	private final NfcInitiatorHandler initiatorHandler;
 	
@@ -30,14 +32,15 @@ public class NfcInitiator {
 
 		return new TagDiscoverHandler() {
 			@Override
-			public void tagDiscovered(final NfcTransceiver nfcTransceiver, boolean handshake, boolean polling, boolean continueNFC) {
+			public void tagDiscovered(final NfcTransceiver nfcTransceiver, boolean handshake, boolean continueNFC) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "Tag detected!");
+					LOGGER.debug( "Tag detected!");
 				}
+				initiatorHandler.nfcTagFound();
 				try {			
 					if (!initiating) {
 						if (Config.DEBUG) {
-							Log.d(TAG, "Nothing to do shutdown 1!");
+							LOGGER.debug( "Nothing to do shutdown 1!");
 						}
 						nfcTransceiver.close();
 						return;
@@ -55,7 +58,7 @@ public class NfcInitiator {
 					if (!messageQueue.isEmpty()) {
 						if (!processMessage(nfcTransceiver)) {
 							if (Config.DEBUG) {
-								Log.d(TAG, "Nothing to do shutdown 2!");
+								LOGGER.debug( "Nothing to do shutdown 2!");
 							}
 							return;
 						}
@@ -65,16 +68,10 @@ public class NfcInitiator {
 						byte[] message = initiatorHandler.nextMessage();
 						if (message == null) {
 							// start polling
-							if(polling) {
-								if (Config.DEBUG) {
-									Log.d(TAG, "Start polling");
-								}
-								messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
-							} else {
-								if (Config.DEBUG) {
-									Log.d(TAG, "Nothing to do shutdown 3!");
-								}
+							if (Config.DEBUG) {
+								LOGGER.debug( "Start polling");
 							}
+							messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
 						} else {
 
 							// split it
@@ -90,7 +87,7 @@ public class NfcInitiator {
 					}
 					
 					if(Config.DEBUG) {
-						Log.d(TAG, "loop done");
+						LOGGER.debug( "loop done");
 					}
 					
 					if(!continueNFC) {
@@ -166,7 +163,7 @@ public class NfcInitiator {
 					} catch (NfcLibException e) {
 						initiating = false;
 						if (Config.DEBUG) {
-							Log.d(TAG, "loop done");
+							LOGGER.debug( "loop done");
 						}
 						reset();
 					}
@@ -186,11 +183,8 @@ public class NfcInitiator {
 
 			@Override
 			public void tagLost(NfcTransceiver nfcTransceiver) {
-				/*
-				 * if(!initiating) { transceiver.turnOff(activity); }
-				 */
-				System.err.println("TG LOST");
-
+				LOGGER.debug("Tag lost");
+				initiatorHandler.nfcTagLost();
 			}
 		};
 	}
@@ -200,7 +194,7 @@ public class NfcInitiator {
 			messageLoop(transceiver);
 		} catch (NfcLibException e) {
 			if (Config.DEBUG) {
-				Log.d(TAG, "Tag lost");
+				LOGGER.debug( "Tag lost");
 			}
 			return false;
 		} catch (Throwable t) {
@@ -229,7 +223,7 @@ public class NfcInitiator {
 
 	private void handshake(NfcTransceiver transceiver) throws Exception {
 		if (Config.DEBUG) {
-			Log.d(TAG, "init NFC");
+			LOGGER.debug( "init NFC");
 		}
 		final NfcMessage initMessage;
 		final int maxLenThis = transceiver.maxLen();
@@ -253,25 +247,21 @@ public class NfcInitiator {
 
 		// no sequence number here,initiating.set( as this is a special message
 		if (Config.DEBUG) {
-			Log.d(TAG, "handshake write: " + Arrays.toString(initMessage.bytes()));
+			LOGGER.debug( "handshake write: {}", Arrays.toString(initMessage.bytes()));
 		}
 		final byte[] response = transceiver.write(initMessage.bytes());
 		final NfcMessage responseMessage = new NfcMessage(response);
 		if (Config.DEBUG) {
-			Log.d(TAG, "handshake response: " + Arrays.toString(response));
+			LOGGER.debug( "handshake response: {}", Arrays.toString(response));
 		}
 		// --> here we can get an exception. We should get back this array:
 		// {2,0,0,0,x}
 		if (responseMessage.sequenceNumber() != 0) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "handshake header unexpected: " + responseMessage);
-			}
+			LOGGER.error( "handshake header unexpected: {}", responseMessage);
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
 		if (responseMessage.payload().length != 2 + 16) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "handshake payload unexpected: " + responseMessage);
-			}
+			LOGGER.error( "handshake payload unexpected: {}", responseMessage);
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
 		final int maxLenOther = Utils.byteArrayToShort(responseMessage.payload(), 0);
@@ -287,7 +277,7 @@ public class NfcInitiator {
 
 	private void messageLoop(NfcTransceiver transceiver) throws Exception {
 		if (Config.DEBUG) {
-			Log.d(TAG, "start message loop");
+			LOGGER.debug( "start message loop");
 		}
 		while (!messageQueue.isEmpty()) {
 			final NfcMessage request = messageQueue.peek();
@@ -295,7 +285,7 @@ public class NfcInitiator {
 			request.sequenceNumber(lastMessageSent);
 
 			if (Config.DEBUG) {
-				Log.d(TAG, "loop write: " + request + " / " + Arrays.toString(request.bytes()));
+				LOGGER.debug( "loop write: {} / {}", request, Arrays.toString(request.bytes()));
 			}
 			byte[] response = transceiver.write(request.bytes());
 
@@ -304,7 +294,7 @@ public class NfcInitiator {
 			}
 			NfcMessage responseMessage = new NfcMessage(response);
 			if (Config.DEBUG) {
-				Log.d(TAG, "loop response: " + responseMessage);
+				LOGGER.debug( "loop response: {}", responseMessage);
 			}
 
 			// message successfully sent, remove from queue
@@ -313,7 +303,7 @@ public class NfcInitiator {
 
 			if (!validateSequence(request, responseMessage)) {
 				if (Config.DEBUG) {
-					Log.e(TAG, "sequence error " + request + " / " + response);
+					LOGGER.debug( "sequence error {} / {}", request, response);
 				}
 				throw new IOException("invalid sequence");
 			}
@@ -364,9 +354,7 @@ public class NfcInitiator {
 	public static boolean validateSequence(final NfcMessage request, final NfcMessage response) {
 		boolean check = request.sequenceNumber() == response.sequenceNumber();
 		if (!check) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "sequence number mismatch, expected " + ((request.sequenceNumber() + 1) % 16) + ", but was: " + response.sequenceNumber());
-			}
+			LOGGER.error( "sequence number mismatch, expected {}, but was: {}", ((request.sequenceNumber() + 1) % 16), response.sequenceNumber());
 			return false;
 		}
 		return true;

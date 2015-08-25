@@ -2,6 +2,9 @@ package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import android.app.Activity;
 import android.content.Context;
 import android.nfc.NfcAdapter;
@@ -9,7 +12,6 @@ import android.nfc.NfcAdapter.ReaderCallback;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
-import android.util.Log;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
@@ -27,7 +29,7 @@ import ch.uzh.csg.comm.TagDiscoverHandler;
  */
 public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	
-	private static final String TAG = "ch.uzh.csg.nfclib.transceiver.AndroidNfcTransceiver";
+	private static final Logger LOGGER = LoggerFactory.getLogger(AndroidNfcTransceiver.class);
 
 	/*
 	 * NXP chip supports max 255 bytes (problems might arise sometimes if
@@ -68,19 +70,18 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	@Override
 	public void onTagDiscovered(Tag tag) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "tag discovered:ExecutorService executorService; " + tag);
+			LOGGER.debug( "tag discovered:ExecutorService executorService; ", tag);
 		}
+		
 		
 		isoDep = IsoDep.get(tag);
 		 
 		try {
 			isoDep.connect();
 			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter, nfcInit);
-			nfcInit.tagDiscovered(transceiver, true, true, true);
+			nfcInit.tagDiscovered(transceiver, true, true);
 		} catch (IOException e) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "Could not connnect isodep: ", e);
-			}
+			LOGGER.error( "Could not connnect isodep: ", e);
 			nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 		}
 	}
@@ -102,14 +103,14 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 			
 			if (!nfcAdapter.isEnabled()) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "could not write message, nfcAdapter is not enabled");
+					LOGGER.debug( "could not write message, nfcAdapter is not enabled");
 				}
 				throw new IOException(NFCTRANSCEIVER_NOT_ENABLED);
 			}
 
 			if (!isoDep.isConnected()) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "could not write message, isodep is not or no longer connected");
+					LOGGER.debug( "could not write message, isodep is not or no longer connected");
 				}
 				throw new IOException(NFCTRANSCEIVER_NOT_CONNECTED);
 			}
@@ -156,7 +157,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	public boolean turnOn(Activity activity) {
 		
 		if (Config.DEBUG) {
-			Log.d(TAG, "turn on device");
+			LOGGER.debug( "turn on device");
 		}
 		
 		/*
@@ -177,7 +178,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		
 		if (!nfcAdapter.isEnabled()) {
 			if (Config.DEBUG) {
-				Log.d(TAG, "could not turn on NFC, nfcAdapter is not enabled");
+				LOGGER.debug( "could not turn on NFC, nfcAdapter is not enabled");
 			}
 			return false;
 		}
@@ -187,13 +188,13 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	@Override
 	public void turnOff(Activity activity) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "turn off device");
+			LOGGER.debug( "turn off device");
 		}
 		if(isoDep!=null) {
 			try {
 				isoDep.close();
 			} catch (Throwable e) {
-				Log.e(TAG, "could not close isodep", e);
+				LOGGER.error( "could not close isodep", e);
 			}
 		}
 		if (nfcAdapter.isEnabled()) {

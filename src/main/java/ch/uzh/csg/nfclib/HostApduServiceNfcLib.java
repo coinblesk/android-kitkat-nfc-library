@@ -2,13 +2,15 @@ package ch.uzh.csg.nfclib;
 
 import java.util.Arrays;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.nfc.cardemulation.HostApduService;
 import android.os.Bundle;
-import android.util.Log;
 import ch.uzh.csg.comm.Config;
 
 /**
@@ -26,7 +28,7 @@ public final class HostApduServiceNfcLib extends HostApduService {
 	 * files and will crash other projects if you do so!
 	 */
 
-	private static final String TAG = "ch.uzh.csg.nfclib.HostApduServiceNfcLib";
+	private static final Logger LOGGER = LoggerFactory.getLogger(HostApduServiceNfcLib.class);
 	
 	public static final String NFC_SERVICE_SEND_INTENT = "com.coinblesk.NFC_SERVICE_SEND_INTENT";
 	public static final String NFC_SERVICE_RECEIVE_INTENT = "com.coinblesk.NFC_SERVICE_RECEIVE_INTENT";
@@ -39,7 +41,7 @@ public final class HostApduServiceNfcLib extends HostApduService {
 		public void onReceive(final Context context, final Intent intent) {
 			final byte[] responseApdu = intent.getExtras().getByteArray(NFC_SERVICE_RECEIVE_DATA);
 			if (Config.DEBUG) {
-				Log.d(TAG, "about to return "+Arrays.toString(responseApdu));
+				LOGGER.debug("about to return ", Arrays.toString(responseApdu));
 			}
 			sendResponseApdu(responseApdu);
 		}
@@ -48,7 +50,7 @@ public final class HostApduServiceNfcLib extends HostApduService {
 	@Override
 	public void onCreate() {
 		if (Config.DEBUG) {
-			Log.d(TAG, "created HostApduService service");
+			LOGGER.debug( "created HostApduService service");
 		}
 		super.onCreate();
 		final IntentFilter intentFilter = new IntentFilter();
@@ -71,7 +73,7 @@ public final class HostApduServiceNfcLib extends HostApduService {
 	@Override
 	public void onDeactivated(final int reason) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "deactivate: "+reason);
+			LOGGER.debug( "deactivate: {}", reason);
 		}
 		final Intent intent = new Intent(NFC_SERVICE_SEND_INTENT);
 	    intent.putExtra(NFC_SERVICE_SEND_DEACTIVATE, reason);

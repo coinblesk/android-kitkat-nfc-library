@@ -3,6 +3,9 @@ package ch.uzh.csg.comm;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import ch.uzh.csg.comm.NfcMessage.Type;
 
 
@@ -18,6 +21,8 @@ import ch.uzh.csg.comm.NfcMessage.Type;
  * 
  */
 public class NfcMessageSplitter {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(NfcMessageSplitter.class);
 	
 	private int payloadLength = Integer.MAX_VALUE;
 	private byte[] data = null;
@@ -56,7 +61,7 @@ public class NfcMessageSplitter {
 		 * into (taking into account protocol headers etc.).
 		 */
 		final int fragments = (len + payloadLength - 1) / payloadLength;
-		System.err.println("len: "+len+" payloadlen: "+payloadLength);
+		LOGGER.debug("Total length: {}, payloadlen: {}", len, payloadLength);
 		final ArrayList<NfcMessage> list = new ArrayList<NfcMessage>(fragments);
 		
 		if(fragments == 1) {

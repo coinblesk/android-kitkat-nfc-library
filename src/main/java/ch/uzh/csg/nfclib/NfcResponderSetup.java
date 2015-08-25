@@ -1,11 +1,13 @@
 package ch.uzh.csg.nfclib;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.util.Log;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcEvent;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
@@ -36,7 +38,7 @@ import ch.uzh.csg.comm.NfcResponseHandler;
  * 
  */
 public class NfcResponderSetup  {
-	private static final String TAG = "ch.uzh.csg.nfclib.NfcResponderSetup";
+	private static final Logger LOGGER = LoggerFactory.getLogger(HostApduServiceNfcLib.class);
 	
 	public static final String NULL_ARGUMENT = "The message is null";
 	public static final String NFCTRANSCEIVER_NOT_CONNECTED = "Could not write message, NfcTransceiver is not connected.";
@@ -56,7 +58,7 @@ public class NfcResponderSetup  {
         @Override
         public void onReceive(final Context context, final Intent intent) {
         	if(Config.DEBUG) {
-        		Log.d(TAG, "received broadcast message " + intent);
+        		LOGGER.debug( "received broadcast message ", intent);
         	}
         	final byte[] responseApdu = intent.getExtras().getByteArray(HostApduServiceNfcLib.NFC_SERVICE_SEND_DATA);
         	if(responseApdu != null) {

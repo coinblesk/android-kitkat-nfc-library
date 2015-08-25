@@ -2,6 +2,9 @@ package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.acs.smartcard.Reader;
 import com.acs.smartcard.Reader.OnStateChangeListener;
 import com.acs.smartcard.ReaderException;
@@ -14,7 +17,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
-import android.util.Log;
 import android.util.Pair;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcEvent;
@@ -33,7 +35,7 @@ import ch.uzh.csg.comm.TagDiscoverHandler;
  */
 public class ACSNfcTransceiver implements NfcTrans {
 
-	private static final String TAG = "ch.uzh.csg.nfclib.transceiver.ExternalNfcTransceiver";
+	private static final Logger LOGGER = LoggerFactory.getLogger(ACSNfcTransceiver.class);
 
 	/*
 	 * 64 is the maximum due to a sequence bug in the ACR122u
@@ -49,7 +51,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 	private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 	
-	private static final ReaderOpenCallback callback = new ReaderOpenCallback();
+	//private static final ReaderOpenCallback callback = new ReaderOpenCallback();
 	
 	/*private final Reader reader;
 	
@@ -83,22 +85,25 @@ public class ACSNfcTransceiver implements NfcTrans {
 			final TagDiscoverHandler nfcInit, final ACSTransceiver transceiver) {
 		
 		if (Config.DEBUG) {
-			Log.d(TAG, "set listener");
+			LOGGER.debug( "set listener");
 		}
 		
 		reader.setOnStateChangeListener(new OnStateChangeListener() {
+			private boolean disabledBuzzer = false;
 			public void onStateChange(int slotNum, int prevState, int currState) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "statechange from: " + prevState + " to: " + currState);
+					LOGGER.debug( "statechange from: {} to: {}", prevState, currState);
 				}			
-				if (currState == Reader.CARD_PRESENT) {				
+				if (currState == Reader.CARD_PRESENT) {
 					try {					
-						transceiver.initCard();
-						nfcInit.tagDiscovered(transceiver, true, true, true);
-					} catch (ReaderException e) {
-						if (Config.DEBUG) {
-							Log.e(TAG, "Could not connnect reader (ReaderException): ", e);
+						transceiver.initCard(slotNum);
+						if(!disabledBuzzer) {
+							transceiver.disableBuzzer();
+							disabledBuzzer = true;
 						}
+						nfcInit.tagDiscovered(transceiver, true, true);
+					} catch (ReaderException e) {
+						LOGGER.error( "Could not connnect reader (ReaderException): ", e);
 						nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 					}
 				} else if(currState == Reader.CARD_ABSENT) {
@@ -132,7 +137,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 		return null;
 	}
 	
-	public static Pair<ACSTransceiver, Reader> createReaderAndTransceiver(final Context context, final ReaderOpenCallback callback, final TagDiscoverHandler nfcInit) throws NfcLibException {
+	public static Pair<ACSTransceiver, Reader> createReaderAndTransceiver(final Context context, /*final ReaderOpenCallback callback,*/ final TagDiscoverHandler nfcInit) throws NfcLibException {
 		UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 		Reader reader = new Reader(manager);
 		UsbDevice externalDevice = externalReaderAttached(context, manager, reader);
@@ -142,16 +147,16 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 		//ask user for permission
 		if(Config.DEBUG) {
-			Log.d(TAG, "ask user for permission");
+			LOGGER.debug( "ask user for permission");
 		}
 		ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
 		try {
 			reader.open(externalDevice);
 			
-			callback.readerOpen(reader, externalDevice, transceiver);
-		} catch (Throwable t) {
+			//callback.readerOpen(reader, externalDevice, transceiver);
+		} catch (IllegalArgumentException e) {
 			if(Config.DEBUG) {
-				Log.d(TAG, "could not access device, ask for permission", t);
+				LOGGER.debug( "could not access device, ask for permission", e);
 			}
 			PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
 			manager.requestPermission(externalDevice, permissionIntent);	
@@ -184,9 +189,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 			}
 		}
 	
-		private void initCard() throws ReaderException {
-			reader.power(0, Reader.CARD_WARM_RESET);
-			reader.setProtocol(0, Reader.PROTOCOL_T0 | Reader.PROTOCOL_T1);
+		private void initCard(final int slotNum) throws ReaderException {
+			reader.power(slotNum, Reader.CARD_WARM_RESET);
+			reader.setProtocol(slotNum, Reader.PROTOCOL_T0 | Reader.PROTOCOL_T1);
 		}
 		
 		
@@ -195,7 +200,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 		public byte[] write(byte[] input) throws Exception {
 			if (!reader.isOpened()) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "could not write message, reader is not or no longe open");
+					LOGGER.debug( "could not write message, reader is not or no longe open");
 				}
 				throw new IOException(NFCTRANSCEIVER_NOT_CONNECTED);
 			}
@@ -210,15 +215,16 @@ public class ACSNfcTransceiver implements NfcTrans {
 				length = reader.transmit(0, input, input.length, recvBuffer, recvBuffer.length);
 			} catch (ReaderException e) {
 				if (Config.DEBUG) {
-					Log.e(TAG, "could not write message - ReaderException", e);
+					LOGGER.debug( "could not write message - ReaderException", e);
 				}
 				throw new IOException(UNEXPECTED_ERROR);
 			}
 
 			if (length <= 0) {
 				if (Config.DEBUG) {
-					Log.d(TAG, "could not write message - return value is 0");
+					LOGGER.debug( "could not write message - return value is 0");
 				}
+				//most likely due to tag lost
 				throw new IOException(UNEXPECTED_ERROR);
 			}
 
@@ -239,7 +245,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 		}
 	}
 	
-	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit,  final ReaderOpenCallback callback, final ACSTransceiver transceiver) {
+	private static BroadcastReceiver createBroadcastReceiver(final Reader reader, final TagDiscoverHandler nfcInit,  /*final ReaderOpenCallback callback,*/ final ACSTransceiver transceiver) {
 		return new BroadcastReceiver() {
 
 			@Override
@@ -247,12 +253,12 @@ public class ACSNfcTransceiver implements NfcTrans {
 				String action = intent.getAction();
 				
 				if(Config.DEBUG) {
-					Log.d(TAG, "actcion: "+ action);
+					LOGGER.debug( "actcion: {}", action);
 				}
 
 				if (ACTION_USB_PERMISSION.equals(action)) {
 					if(Config.DEBUG) {
-						Log.d(TAG, "try to create reader");
+						LOGGER.debug( "try to create reader");
 					}
 					synchronized (this) {
 						UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
@@ -260,10 +266,10 @@ public class ACSNfcTransceiver implements NfcTrans {
 							if (device != null) {
 								try {
 									if(Config.DEBUG) {
-										Log.d(TAG, "reader open");
+										LOGGER.debug( "reader open");
 									}
 									reader.open(device);
-									callback.readerOpen(reader, device, transceiver);
+									//callback.readerOpen(reader, device, transceiver);
 								} catch (Exception e) {
 									nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 								}
@@ -278,7 +284,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 							reader.close();
 						}
 						if(Config.DEBUG) {
-							Log.d(TAG, "reader detached");
+							LOGGER.debug( "reader detached");
 						}
 					}
 				}
@@ -296,25 +302,25 @@ public class ACSNfcTransceiver implements NfcTrans {
 	public boolean turnOn(Activity activity) {
 		if(!broadcastReceiverRegistered) {
 			if(Config.DEBUG) {
-				Log.d(TAG, "turn on ACS");
+				LOGGER.debug( "turn on ACS");
 			}
 			
 			
 			
 			final ACSTransceiver transceiver;
 			try {
-				Pair<ACSTransceiver, Reader> pair = createReaderAndTransceiver(activity, callback, nfcInit);
+				Pair<ACSTransceiver, Reader> pair = createReaderAndTransceiver(activity/*, callback*/, nfcInit);
 				transceiver = pair.first;
 				reader = pair.second;
 			} catch (NfcLibException e) {
-				Log.e(TAG, "reader not available", e);
+				LOGGER.error( "reader not available", e);
 				return false;
 			}
 			IntentFilter filter = new IntentFilter();
 			filter.addAction(ACTION_USB_PERMISSION);
 			filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
 			
-			broadcastReceiver = createBroadcastReceiver(reader, nfcInit, callback, transceiver);
+			broadcastReceiver = createBroadcastReceiver(reader, nfcInit/*, callback*/, transceiver);
 			setOnStateChangedListener(reader, nfcInit, transceiver);
 			activity.registerReceiver(broadcastReceiver, filter);
 			broadcastReceiverRegistered = true;
@@ -326,7 +332,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 	public void turnOff(Activity activity) {
 		if(broadcastReceiverRegistered) {
 			if(Config.DEBUG) {
-				Log.d(TAG, "Turn off ACS: " + broadcastReceiverRegistered);
+				LOGGER.debug( "Turn off ACS: {}", broadcastReceiverRegistered);
 			}
 			
 			broadcastReceiverRegistered = false;
@@ -334,21 +340,21 @@ public class ACSNfcTransceiver implements NfcTrans {
 				reader.close();
 				reader = null;
 				if(Config.DEBUG) {
-					Log.d(TAG, "Reader closed");
+					LOGGER.debug( "Reader closed");
 				}
 			}
 			activity.unregisterReceiver(broadcastReceiver);
 		}
 	}
 	
-	private static class ReaderOpenCallback  {
+	/*private static class ReaderOpenCallback  {
 		//@Override
 		public void readerOpen(Reader reader, UsbDevice externalDevice,  ACSTransceiver transceiver) {
 			try {
 				transceiver.disableBuzzer();
 			} catch (ReaderException e) {
-				Log.e(TAG, "could not initialize transceiver", e);
+				LOGGER.error( "could not initialize transceiver", e);
 			}
 		}
-	};
+	};*/
 }

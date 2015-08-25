@@ -4,8 +4,10 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import android.nfc.cardemulation.HostApduService;
-import android.util.Log;
 import ch.uzh.csg.comm.NfcMessage.Type;
 import ch.uzh.csg.nfclib.HostApduServiceNfcLib;
 import ch.uzh.csg.nfclib.NfcInitiatorSetup;
@@ -21,7 +23,7 @@ import ch.uzh.csg.nfclib.NfcInitiatorSetup;
  * 
  */
 public class NfcResponder {
-	private static final String TAG = "ch.uzh.csg.nfclib.NfcResponder";
+	private static final Logger LOGGER = LoggerFactory.getLogger(NfcResponder.class);
 
 	private final NfcResponseHandler responseHandler;
 	private final int maxTransceiveLength;
@@ -57,7 +59,7 @@ public class NfcResponder {
 	
 	public byte[] processIncomingData(byte[] bytes) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "processCommandApdu with " + Arrays.toString(bytes));
+			LOGGER.debug( "processCommandApdu with {}", Arrays.toString(bytes));
 		}
 		
 		NfcMessage inputMessage = new NfcMessage(bytes);
@@ -73,13 +75,13 @@ public class NfcResponder {
 		switch(inputMessage.type()) {
 		case READ_BINARY:
 			if (Config.DEBUG) {
-				Log.d(TAG, "keep alive message");
+				LOGGER.debug( "keep alive message");
 			}
 			// no sequence number in here
 			return new NfcMessage(Type.READ_BINARY).bytes();
 		case AID_1:
 			if (Config.DEBUG) {
-				Log.d(TAG, "AID1 selected");
+				LOGGER.debug( "AID1 selected");
 			}
 			maxLen = Math.min(Short.MAX_VALUE, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
@@ -88,7 +90,7 @@ public class NfcResponder {
 			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		case AID_2:
 			if (Config.DEBUG) {
-				Log.d(TAG, "AID2 selected");
+				LOGGER.debug( "AID2 selected");
 			}
 			maxLen = Math.min(53, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
@@ -97,7 +99,7 @@ public class NfcResponder {
 			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		case AID_3:
 			if (Config.DEBUG) {
-				Log.d(TAG, "AID3 selected");
+				LOGGER.debug( "AID3 selected");
 			}
 			maxLen = Math.min(245, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
@@ -106,7 +108,7 @@ public class NfcResponder {
 			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
 		default:
 			if (Config.DEBUG) {
-				Log.d(TAG, "process regular message " + inputMessage);
+				LOGGER.debug( "process regular message {}", inputMessage);
 			}
 			
 			final boolean check = inputMessage.check(lastMessageReceived);
@@ -114,10 +116,9 @@ public class NfcResponder {
 			
 			NfcMessage outputMessage = null;
 			if (!check && !repeat) {
-				if (Config.DEBUG) {
-					Log.e(TAG, "sequence number mismatch " + inputMessage.sequenceNumber() + 
-							" / " + (lastMessageReceived == null ? -1 : lastMessageReceived.sequenceNumber()));
-				}
+				LOGGER.error( "sequence number mismatch {} / {}", inputMessage.sequenceNumber(), 
+							(lastMessageReceived == null ? -1 : lastMessageReceived.sequenceNumber()));
+				
 				
 				responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
 				outputMessage = new NfcMessage(Type.ERROR);
@@ -156,7 +157,7 @@ public class NfcResponder {
 		byte[] retVal = outputMessage.bytes();
 		
 		if (Config.DEBUG) {
-			Log.d(TAG, "sending: " + outputMessage);
+			LOGGER.debug( "sending: {}", outputMessage);
 		}
 		
 		return retVal;
@@ -173,12 +174,12 @@ public class NfcResponder {
 
 	private NfcMessage handleRequest(final NfcMessage incoming) throws Exception {
 		if (Config.DEBUG) {
-			Log.d(TAG, "received: " + incoming);
+			LOGGER.debug( "received: {}", incoming);
 		}
 
 		if (incoming.isError()) {
 			if (Config.DEBUG) {
-				Log.d(TAG, "nfc error reported - returning null");
+				LOGGER.debug( "nfc error reported - returning null");
 			}
 			reset();
 			responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
@@ -210,18 +211,14 @@ public class NfcResponder {
 			} else if (incoming.type() == Type.FRAGMENT){
 				//continue with our message queue
 				if (messageQueue.isEmpty()) {
-					if (Config.DEBUG) {
-						Log.e(TAG, "nothing to return (get next fragment)");
-					}
+					LOGGER.error( "nothing to return (get next fragment)");
 					reset();
 					responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
 					return new NfcMessage(Type.ERROR);
 				}
 				return messageQueue.poll();
 			} else {
-				if (Config.DEBUG) {
-					Log.e(TAG, "unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);
-				}
+				LOGGER.error( "unknown fragment: {} for incoming msg: {}", incoming.type(), incoming);
 				reset();
 				responseHandler.handleFailed("unknown fragment: " + incoming.type()+ " for incoming msg: " + incoming);
 				return new NfcMessage(Type.ERROR);
@@ -239,9 +236,7 @@ public class NfcResponder {
 			reset();
 			return new NfcMessage(Type.ERROR);
 		default:
-			if (Config.DEBUG) {
-				Log.e(TAG, "unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
-			}
+			LOGGER.error( "unknown type: {} for incoming msg: {}", incoming.type(), incoming);
 			reset();
 			responseHandler.handleFailed("unknown type: " + incoming.type()+ " for incoming msg: " + incoming);
 			return new NfcMessage(Type.ERROR);
@@ -275,13 +270,11 @@ public class NfcResponder {
 		}
 
 		if (Config.DEBUG) {
-			Log.d(TAG, "returning: " + response.length + " bytes, " + messageQueue.size() + " fragments");
+			LOGGER.debug( "returning: {} bytes, {} fragments",  response.length, messageQueue.size());
 		}
 		
 		if (messageQueue.isEmpty()) {
-			if (Config.DEBUG) {
-				Log.e(TAG, "nothing to return - message queue is empty");
-			}
+			LOGGER.error( "nothing to return - message queue is empty");
 			reset();
 			responseHandler.handleFailed("nothing to return - message queue is empty");
 			return new NfcMessage(Type.ERROR);
@@ -298,8 +291,8 @@ public class NfcResponder {
 	 */
 	public void onDeactivated(int reason) {
 		if (Config.DEBUG) {
-			Log.d(TAG, "deactivated due to " + 
-					(reason == HostApduService.DEACTIVATION_LINK_LOSS ? "link loss" : "deselected") + "(" + reason + ")");
+			LOGGER.debug( "deactivated due to {} ({})", 
+					(reason == HostApduService.DEACTIVATION_LINK_LOSS ? "link loss" : "deselected"), reason);
 		}
 		responseHandler.handleFailed(NfcInitiatorSetup.TIMEOUT);
 	}	

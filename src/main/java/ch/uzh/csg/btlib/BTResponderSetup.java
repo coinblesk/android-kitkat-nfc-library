@@ -4,6 +4,9 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -17,17 +20,14 @@ import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.ParcelUuid;
-import android.util.Log;
-import android.widget.Toast;
 import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcResponder;
 import ch.uzh.csg.comm.NfcResponseHandler;
 
 public class BTResponderSetup {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(BTResponderSetup.class);
 	
 	final public static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	
@@ -43,44 +43,38 @@ public class BTResponderSetup {
 	final private static AdvertiseCallback ADVERTISE_CALLBACK = new AdvertiseCallback() {
 		@Override
 		public void onStartFailure(int errorCode) {
-			Log.e(TAG, "could not start BTLE advertising");
+			LOGGER.error("could not start BTLE advertising");
 		}
 	};
-	final private static String TAG = "ch.uzh.csg.btlib.BTResponderSetup";
 	
 	private BluetoothGattServer server;
-	private BluetoothAdapter bluetoothAdapter;
+	
+	final private BluetoothAdapter bluetoothAdapter;
+	final private BluetoothManager bluetoothManager;
 	final private AtomicReference<BluetoothGattCharacteristic> remoteUUIDref = new AtomicReference<>();
 	
-	public BTResponderSetup(UUID localUUID) {
+	 private static BTResponderSetup instance = null;
+	
+	public static BTResponderSetup init(UUID localUUID, BluetoothManager bluetoothManager, 
+    		BluetoothAdapter bluetoothAdapter) {
+    	if(instance == null) {
+    		//we need peripheral mode, otherwise it makes no sense to start a server
+    		if(!bluetoothAdapter.isMultipleAdvertisementSupported()) {
+    			return null;
+    		}
+    		instance = new BTResponderSetup(localUUID, bluetoothManager, bluetoothAdapter);
+    	}
+    	return instance;
+    }
+	
+	private BTResponderSetup(UUID localUUID, BluetoothManager bluetoothManager, BluetoothAdapter bluetoothAdapter) {
 		this.localUUID = localUUID;
+		this.bluetoothAdapter = bluetoothAdapter;
+		this.bluetoothManager = bluetoothManager;
 	}
 	
 	
 	public void advertise(final NfcResponseHandler responseHandler, final Activity activity) {
-		
-		// Use this check to determine whether BLE is supported on the device. Then
-		// you can selectively disable BLE-related features.
-		if (!activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-		    Toast.makeText(activity, "n/a", Toast.LENGTH_SHORT).show();
-		    activity.finish();
-		}
-		
-		// Initializes Bluetooth adapter.
-		BluetoothManager bluetoothManager =
-		        (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
-		bluetoothAdapter = bluetoothManager.getAdapter();
-		
-		// Ensures Bluetooth is available on the device and it is enabled. If not,
-		// displays a dialog requesting user permission to enable Bluetooth.
-		if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-		    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-		    activity.startActivityForResult(enableBtIntent, 1);
-		}
-		if(!bluetoothAdapter.isMultipleAdvertisementSupported()) {
-			Toast.makeText(activity, "peripheral mode n/a", Toast.LENGTH_SHORT).show();
-		    activity.finish();
-		}
 		server = bluetoothManager.openGattServer(activity, new BluetoothGattServerCallback() {
 			
 			private byte[] response = null;
@@ -90,7 +84,7 @@ public class BTResponderSetup {
 			public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset,
 					BluetoothGattCharacteristic characteristic) {
 				if(Config.DEBUG) {
-					Log.d(TAG, "got request read, send back: "+Arrays.toString(response));
+					LOGGER.debug( "got request read, send back: {}", Arrays.toString(response));
 				}
 				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
 			}
@@ -101,12 +95,12 @@ public class BTResponderSetup {
 					boolean preparedWrite, boolean responseNeeded, int offset,
 					byte[] value) {
 				if(Config.DEBUG) {
-					Log.d(TAG, "got request write: "+Arrays.toString(value));
+					LOGGER.debug( "got request write: {}", Arrays.toString(value));
 				}
 				
 				byte[] response = responder.processIncomingData(value);
 				if(Config.DEBUG) {
-					Log.d(TAG, "send back: "+Arrays.toString(response));
+					LOGGER.debug( "send back: {}", Arrays.toString(response));
 				}
 				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
 				
@@ -114,13 +108,16 @@ public class BTResponderSetup {
 				if(remoteUUIDref.get() != null) {
 					BluetoothGattCharacteristic characteristicReply = remoteUUIDref.get();
 					if(Config.DEBUG) {
-						Log.d(TAG, "we have a server reply addrress: "+characteristicReply.toString());
+						LOGGER.debug( "we have a server reply addrress: {}", characteristicReply.toString());
 					}
 					characteristicReply.setValue(response);
-					server.notifyCharacteristicChanged(device, characteristicReply, true);
+					boolean retVal = server.notifyCharacteristicChanged(device, characteristicReply, true);
+					if(Config.DEBUG) {
+						LOGGER.debug( "sent reply: {}", retVal);
+					}
 				} else {
 					if(Config.DEBUG) {
-						Log.d(TAG, "no server reply addrress");
+						LOGGER.debug( "no server reply addrress");
 					}
 				}
 			}
@@ -128,7 +125,7 @@ public class BTResponderSetup {
 			@Override
 			public void onMtuChanged(BluetoothDevice device, int mtu) {
 				if(Config.DEBUG) {
-					Log.d(TAG, "MTU changed to " + mtu);
+					LOGGER.debug( "MTU changed to {}", mtu);
 				}
 				responder = new NfcResponder(responseHandler, mtu);
 			}
@@ -138,7 +135,7 @@ public class BTResponderSetup {
 			public void onConnectionStateChange(BluetoothDevice device,
 					int status, int newState) {
 				if(Config.DEBUG) {
-					Log.d(TAG, "connected: "+newState+ " / " + BluetoothGatt.STATE_CONNECTED);
+					LOGGER.debug( "connected: {} / {}", newState, BluetoothGatt.STATE_CONNECTED);
 				}
 			}
 		});
@@ -173,7 +170,7 @@ public class BTResponderSetup {
 			return false;
 		}
 		if(Config.DEBUG) {
-			Log.d(TAG, "start advertising");
+			LOGGER.debug( "start advertising");
 		}
 		advertiser.startAdvertising(ADVERTISE_SETTINGS, ADVERTISE_DATA, ADVERTISE_CALLBACK);
 		return true;
@@ -183,7 +180,7 @@ public class BTResponderSetup {
 		BluetoothLeAdvertiser advertiser = bluetoothAdapter
 				.getBluetoothLeAdvertiser();
 		if(Config.DEBUG) {
-			Log.d(TAG, "stop advertising");
+			LOGGER.debug( "stop advertising");
 		}
 		if (advertiser == null) {
 			return false;
@@ -191,7 +188,4 @@ public class BTResponderSetup {
 		advertiser.stopAdvertising(ADVERTISE_CALLBACK);
 		return true;
 	}
-	
-	
-	
 }

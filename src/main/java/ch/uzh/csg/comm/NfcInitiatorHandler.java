@@ -1,5 +1,7 @@
 package ch.uzh.csg.comm;
 
+import ch.uzh.csg.btlib.BTLEController;
+
 /**
  * The implementation of this interface must implement what has to be done on
  * the given {@link NfcEvent}.
@@ -34,5 +36,11 @@ public interface NfcInitiatorHandler {
 	public abstract byte[] nextMessage() throws Exception;
 
 	public abstract void setUUID(byte[] uuid);
+
+	public abstract void btleDiscovered(BTLEController btleController);
+
+	public abstract void nfcTagLost();
+
+	public abstract void nfcTagFound();
 
 }
