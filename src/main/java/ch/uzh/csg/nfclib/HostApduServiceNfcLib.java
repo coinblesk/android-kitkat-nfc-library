@@ -40,18 +40,14 @@ public final class HostApduServiceNfcLib extends HostApduService {
 		@Override
 		public void onReceive(final Context context, final Intent intent) {
 			final byte[] responseApdu = intent.getExtras().getByteArray(NFC_SERVICE_RECEIVE_DATA);
-			if (Config.DEBUG) {
-				LOGGER.debug("about to return ", Arrays.toString(responseApdu));
-			}
+			LOGGER.debug("about to return ", responseApdu);
 			sendResponseApdu(responseApdu);
 		}
 	};
 	
 	@Override
 	public void onCreate() {
-		if (Config.DEBUG) {
-			LOGGER.debug( "created HostApduService service");
-		}
+		LOGGER.debug( "created HostApduService service");
 		super.onCreate();
 		final IntentFilter intentFilter = new IntentFilter();
 		intentFilter.addAction(NFC_SERVICE_RECEIVE_INTENT);
@@ -72,9 +68,7 @@ public final class HostApduServiceNfcLib extends HostApduService {
 	
 	@Override
 	public void onDeactivated(final int reason) {
-		if (Config.DEBUG) {
-			LOGGER.debug( "deactivate: {}", reason);
-		}
+		LOGGER.debug( "deactivate: {}", reason);
 		final Intent intent = new Intent(NFC_SERVICE_SEND_INTENT);
 	    intent.putExtra(NFC_SERVICE_SEND_DEACTIVATE, reason);
 	    sendBroadcast(intent);
