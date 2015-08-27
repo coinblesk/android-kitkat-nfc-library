@@ -123,7 +123,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 			try {
 				byte[] retVal = isoDep.transceive(input);
 				return retVal;
-			} catch (IOException e) {
+			} catch (IOException | IllegalStateException e) {
 				e.printStackTrace();
 				nfcInit.tagLost(this);
 				isoDep.close();
