@@ -29,11 +29,10 @@ public class BTResponderSetup {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(BTResponderSetup.class);
 	
-	final public static UUID COINBLESK_SERVICE_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
+	final public static UUID COINBLESK_CHARACTERISTIC_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	
 	private final UUID localUUID;
 	
-	final private static AdvertiseData ADVERTISE_DATA = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(COINBLESK_SERVICE_UUID)).build();
 	final private static AdvertiseSettings ADVERTISE_SETTINGS = new AdvertiseSettings.Builder()
 		.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
 		.setConnectable(true)
@@ -103,12 +102,9 @@ public class BTResponderSetup {
 					LOGGER.debug( "got request write: {}", Arrays.toString(value));
 				}
 				
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
-				
-				final byte[] response = responder.processIncomingData(value);
-				
+				byte[] response = responder.processIncomingData(value);
 				queue.offer(response);
-				
+				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
 				if(Config.DEBUG) {
 					LOGGER.debug( "send back: {}", Arrays.toString(response));
 				}
@@ -132,15 +128,15 @@ public class BTResponderSetup {
 			}
 		});
 		
-		BluetoothGattService service = new BluetoothGattService(COINBLESK_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
+		BluetoothGattService service = new BluetoothGattService(localUUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 	    
 		BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
-				localUUID, BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ ,
+				COINBLESK_CHARACTERISTIC_UUID, BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ ,
 				BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ);
-	    service.addCharacteristic(characteristic);
+		service.addCharacteristic(characteristic);
 		server.addService(service);
 		
-		startLeAdvertising(bluetoothAdapter);
+		startLeAdvertising(bluetoothAdapter, localUUID);
 		
 	}
 	
@@ -152,7 +148,7 @@ public class BTResponderSetup {
 		return localUUID;
 	}
 	
-	private static boolean startLeAdvertising(BluetoothAdapter bluetoothAdapter) {
+	private static boolean startLeAdvertising(BluetoothAdapter bluetoothAdapter, UUID localUUID) {
 		BluetoothLeAdvertiser advertiser = bluetoothAdapter
 				.getBluetoothLeAdvertiser();
 		if (advertiser == null) {
@@ -161,7 +157,8 @@ public class BTResponderSetup {
 		if(Config.DEBUG) {
 			LOGGER.debug( "start advertising");
 		}
-		advertiser.startAdvertising(ADVERTISE_SETTINGS, ADVERTISE_DATA, ADVERTISE_CALLBACK);
+		AdvertiseData advertiseData = new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(localUUID)).build();
+		advertiser.startAdvertising(ADVERTISE_SETTINGS, advertiseData, ADVERTISE_CALLBACK);
 		return true;
 	}
 	

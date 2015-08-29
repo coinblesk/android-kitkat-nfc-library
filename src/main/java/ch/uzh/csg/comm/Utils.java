@@ -87,17 +87,12 @@ final public class Utils {
 		return combined;
 	}
 	
-	public static UUID hashToUUID(final byte[] data, final byte[] macAddress) {
+	public static UUID hashToUUID(final byte[] data) {
 	    try {
 			final MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
 		    final byte[] hash = sha256.digest(data);
 		    for(int i=0;i<16;i++) {
 		    	hash[i]^= hash[i+16];
-		    }
-		    
-		    //overwrite with macaddress
-		    for(int i=0;i<6;i++) {
-		    	hash[i] = macAddress[i];
 		    }
 		    
 		    final long most = byteArrayToLong(hash, 0);
@@ -148,4 +143,8 @@ final public class Utils {
 		long mostSignificantBits = byteArrayToLong(array, 8);
 		return new UUID(mostSignificantBits, leastSignificantBits);
 	}
+	
+	/*public static UUID uuidPlusOne(UUID uuid) {
+		return new UUID(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits() + 1);
+	}*/
 }

@@ -57,12 +57,15 @@ public class NfcResponder {
 		lastMessageReceived = null;	
 	}
 	
-	public byte[] processIncomingData(byte[] bytes) {
+	public byte[] processIncomingData(byte[] input) {
+		NfcMessage inputMessage = new NfcMessage(input);
+		return processIncomingData(inputMessage).bytes();
+	}
+	
+	public NfcMessage processIncomingData(NfcMessage inputMessage) {
 		if (Config.DEBUG) {
-			LOGGER.debug( "processCommandApdu with {}", Arrays.toString(bytes));
+			LOGGER.debug( "processCommandApdu with {}", Arrays.toString(inputMessage.payload()));
 		}
-		
-		NfcMessage inputMessage = new NfcMessage(bytes);
 		
 		if(inputMessage.isFirst()) {
 			reset();
@@ -78,7 +81,7 @@ public class NfcResponder {
 				LOGGER.debug( "keep alive message");
 			}
 			// no sequence number in here
-			return new NfcMessage(Type.READ_BINARY).bytes();
+			return new NfcMessage(Type.READ_BINARY);
 		case AID_1:
 			if (Config.DEBUG) {
 				LOGGER.debug( "AID1 selected");
@@ -87,7 +90,7 @@ public class NfcResponder {
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
 			merged = Utils.merge(array, responseHandler.getUUID());
-			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
+			return new NfcMessage(Type.SINGLE).payload(merged);
 		case AID_2:
 			if (Config.DEBUG) {
 				LOGGER.debug( "AID2 selected");
@@ -96,7 +99,7 @@ public class NfcResponder {
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
 			merged = Utils.merge(array, responseHandler.getUUID());
-			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
+			return new NfcMessage(Type.SINGLE).payload(merged);
 		case AID_3:
 			if (Config.DEBUG) {
 				LOGGER.debug( "AID3 selected");
@@ -105,7 +108,7 @@ public class NfcResponder {
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
 			merged = Utils.merge(array, responseHandler.getUUID());
-			return new NfcMessage(Type.SINGLE).payload(merged).bytes();
+			return new NfcMessage(Type.SINGLE).payload(merged);
 		default:
 			if (Config.DEBUG) {
 				LOGGER.debug( "process regular message {}", inputMessage);
@@ -126,7 +129,7 @@ public class NfcResponder {
 			}
 			if (!check && repeat) {
 				lastMessageReceived = inputMessage;
-				return lastMessageSent.bytes();
+				return lastMessageSent;
 			}
 			try {
 				outputMessage = handleRequest(inputMessage);
@@ -136,7 +139,7 @@ public class NfcResponder {
 			    
 				reset();
 				responseHandler.handleFailed(e.toString());
-				return new NfcMessage(Type.ERROR).bytes();
+				return new NfcMessage(Type.ERROR);
 			}
 			
 		}
@@ -151,16 +154,14 @@ public class NfcResponder {
 		messageQueue.clear();
 	}
 	
-	private byte[] prepareWrite(NfcMessage outputMessage) {
+	private NfcMessage prepareWrite(NfcMessage outputMessage) {
 		lastMessageSent = outputMessage.sequenceNumber(lastMessageSent);
-		
-		byte[] retVal = outputMessage.bytes();
 		
 		if (Config.DEBUG) {
 			LOGGER.debug( "sending: {}", outputMessage);
 		}
 		
-		return retVal;
+		return outputMessage;
 	}
 
 	private NfcMessage checkForData() {

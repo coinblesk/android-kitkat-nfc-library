@@ -40,7 +40,9 @@ public final class HostApduServiceNfcLib extends HostApduService {
 		@Override
 		public void onReceive(final Context context, final Intent intent) {
 			final byte[] responseApdu = intent.getExtras().getByteArray(NFC_SERVICE_RECEIVE_DATA);
-			LOGGER.debug("about to return ", responseApdu);
+			if (Config.DEBUG) {
+				LOGGER.debug("about to return ", Arrays.toString(responseApdu));
+			}
 			sendResponseApdu(responseApdu);
 		}
 	};

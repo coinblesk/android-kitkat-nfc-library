@@ -58,6 +58,4 @@ public class BTUtils {
 		}
 		return macAddressBytes;
 	}
-	
-	
 }

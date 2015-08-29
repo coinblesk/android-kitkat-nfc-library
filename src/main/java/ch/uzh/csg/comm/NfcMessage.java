@@ -409,5 +409,9 @@ public class NfcMessage {
 		sb.append("/").append(sequenceNumber);
 		sb.append(",len:").append(payload.length);
 		return sb.toString();
-	}	
+	}
+
+	public static int sequence(byte[] input) {
+		return  (input[0] & 0xFF) >>> 4;
+	}
 }
