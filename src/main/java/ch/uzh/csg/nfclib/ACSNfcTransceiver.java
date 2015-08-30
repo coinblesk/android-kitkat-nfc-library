@@ -47,7 +47,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 * 
 	 * The same problem arises sometimes even with the length of 54.
 	 */
-	protected static final int MAX_WRITE_LENGTH = 53;
+	//protected static final int MAX_WRITE_LENGTH = 53;
 
 	private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 	
@@ -144,12 +144,43 @@ public class ACSNfcTransceiver implements NfcTrans {
 		if (externalDevice == null) {
 			throw new NfcLibException("External device is not set");
 		}
+		
+		int pid = externalDevice.getProductId();
+		int vid = externalDevice.getVendorId();
+		
+		if(Config.DEBUG) {
+			LOGGER.debug( "pid={}, vid={}", pid, vid);
+		}
+		
+		
+		
+		final int maxLen;
+		if(pid == 8704 && vid == 1839) {
+			/*
+			 * 64 is the maximum due to a sequence bug in the ACR122u
+			 * http://musclecard.996296
+			 * .n3.nabble.com/ACR122U-response-frames-contain-wrong
+			 * -sequence-numbers-td5002.html If larger than 64, then I get a
+			 * com.acs.smartcard.CommunicationErrorException: The sequence number (4) is
+			 * invalid.
+			 * 
+			 * The same problem arises sometimes even with the length of 54.
+			 */
+			maxLen = 53;
+		} else if(pid == 8730 && vid == 1839) {
+			/**
+			 * The ACR1251U can handle larger message, go for the same amount as the android devices
+			 */
+			maxLen = 245;
+		} else {
+			throw new NfcLibException("unknow device with pid "+pid+":"+vid);
+		}
 
 		//ask user for permission
 		if(Config.DEBUG) {
 			LOGGER.debug( "ask user for permission");
 		}
-		ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit);
+		ACSTransceiver transceiver = new ACSTransceiver(reader, nfcInit, maxLen);
 		try {
 			reader.open(externalDevice);
 			
@@ -171,10 +202,12 @@ public class ACSNfcTransceiver implements NfcTrans {
 			
 		final private Reader reader;
 		final private TagDiscoverHandler nfcInit;
+		final private int maxLen;
 		
-		private ACSTransceiver(Reader reader, TagDiscoverHandler nfcInit) {
+		private ACSTransceiver(Reader reader, TagDiscoverHandler nfcInit, final int maxLen) {
 			this.reader = reader;
 			this.nfcInit = nfcInit;
+			this.maxLen = maxLen;
 		}
 		
 		private void disableBuzzer() throws ReaderException {
@@ -188,6 +221,16 @@ public class ACSNfcTransceiver implements NfcTrans {
 				nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 			}
 		}
+		
+		/*private String firwware() throws ReaderException {
+			byte[] sendBuffer={(byte)0xFF, (byte)0x00, (byte)0x48, (byte)0x00, (byte)0x00};
+			byte[] recvBuffer=new byte[10];
+			int length = reader.transmit(0, sendBuffer, sendBuffer.length, recvBuffer, recvBuffer.length);
+			if(length != 10) {
+				nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
+			}
+			return new String(recvBuffer);
+		}*/
 	
 		private void initCard(final int slotNum) throws ReaderException {
 			reader.power(slotNum, Reader.CARD_WARM_RESET);
@@ -205,11 +248,11 @@ public class ACSNfcTransceiver implements NfcTrans {
 				throw new IOException(NFCTRANSCEIVER_NOT_CONNECTED);
 			}
 
-			if (input.length > MAX_WRITE_LENGTH) {
-				throw new IOException("The message length exceeds the maximum capacity of " + MAX_WRITE_LENGTH + " bytes.");
+			if (input.length > maxLen) {
+				throw new IOException("The message length exceeds the maximum capacity of " + maxLen + " bytes.");
 			}
 
-			final byte[] recvBuffer = new byte[MAX_WRITE_LENGTH];
+			final byte[] recvBuffer = new byte[maxLen];
 			final int length;
 			try {
 				length = reader.transmit(0, input, input.length, recvBuffer, recvBuffer.length);
@@ -235,7 +278,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 		@Override
 		public int maxLen() {
-			return MAX_WRITE_LENGTH;
+			return maxLen;
 		}
 
 		@Override
@@ -291,11 +334,6 @@ public class ACSNfcTransceiver implements NfcTrans {
 			}
 
 		};
-	}
-
-	@Override
-	public int maxLen() {
-		return MAX_WRITE_LENGTH;
 	}
 	
 	@Override

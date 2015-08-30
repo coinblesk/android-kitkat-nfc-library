@@ -149,11 +149,6 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	}
 
 	@Override
-	public int maxLen() {
-		return MAX_WRITE_LENGTH;
-	}
-
-	@Override
 	public boolean turnOn(Activity activity) {
 		
 		if (Config.DEBUG) {
