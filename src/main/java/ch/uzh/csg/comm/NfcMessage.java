@@ -347,6 +347,14 @@ public class NfcMessage {
 		return type() == Type.FRAGMENT && payload.length == 0;
 	}
 	
+	public boolean isPollingRequest() {
+		return type() == Type.POLLING_REQUEST;
+	}
+	
+	public boolean isPollingResponse() {
+		return type() == Type.POLLING_RESPONSE;
+	}
+	
 	public NfcMessage first(boolean first) {
 		this.first = first;
 		return this;
@@ -413,5 +421,13 @@ public class NfcMessage {
 
 	public static int sequence(byte[] input) {
 		return  (input[0] & 0xFF) >>> 4;
+	}
+
+	public static boolean isEmpty(byte[] input) {
+		return (input[0] & IS_EMPTY) > 0;
+	}
+
+	public static Type type(byte[] input) {
+		return Type.values()[input[0] & 0x07];
 	}
 }

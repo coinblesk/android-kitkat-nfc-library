@@ -43,4 +43,6 @@ public interface NfcInitiatorHandler {
 
 	public abstract void nfcTagFound();
 
+	public abstract void btTagLost();
+
 }

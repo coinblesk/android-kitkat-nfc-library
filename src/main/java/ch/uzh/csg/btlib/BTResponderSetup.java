@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,13 +24,16 @@ import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.os.ParcelUuid;
 import ch.uzh.csg.comm.Config;
+import ch.uzh.csg.comm.NfcMessage;
 import ch.uzh.csg.comm.NfcResponder;
+import ch.uzh.csg.comm.NfcMessage.Type;
 
 public class BTResponderSetup {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(BTResponderSetup.class);
 	
-	final public static UUID COINBLESK_CHARACTERISTIC_UUID = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
+	final public static UUID COINBLESK_CHARACTERISTIC_UUID_CLASSIC = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
+	final public static UUID COINBLESK_CHARACTERISTIC_UUID_FAST_READ = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac9");
 	
 	private final UUID localUUID;
 	
@@ -75,22 +79,38 @@ public class BTResponderSetup {
 	public void advertise(final NfcResponder responder, final Activity activity) {
 		server = bluetoothManager.openGattServer(activity, new BluetoothGattServerCallback() {
 			
-			final private BlockingQueue<byte[]> queue = new ArrayBlockingQueue<byte[]>(1);  
+			final private BlockingQueue<byte[]> queue = new ArrayBlockingQueue<byte[]>(1);
+			final AtomicInteger seq = new AtomicInteger(0);
 			
 			@Override
 			public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset,
 					BluetoothGattCharacteristic characteristic) {
-				try {
-					byte[] response = queue.take();
+				if(characteristic.getUuid().equals(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID_FAST_READ)) {
+					
+					NfcMessage input = new NfcMessage(Type.FRAGMENT);
+					input.sequenceNumber(seq.get() + 1);
+					NfcMessage output = responder.processIncomingData(input);
+					seq.set(output.sequenceNumber());
 					if(Config.DEBUG) {
-						LOGGER.debug( "got request read, send back: {}", response);
+						LOGGER.debug( "got request fast read, send back: {}", output);
 					}
-					server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
-				} catch (InterruptedException e) {
-					LOGGER.error("interrupted: ", e);
+					server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, output.bytes());
+					
+				} else if(characteristic.getUuid().equals(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID_CLASSIC)) {
+					try {
+						byte[] response = queue.take();
+						if(Config.DEBUG) {
+							LOGGER.debug( "got request classic read, send back: {}", response);
+						}
+						server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, response);
+					} catch (InterruptedException e) {
+						LOGGER.error("interrupted: ", e);
+						server.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, new byte[0]);
+					}	
+				} else {
+					LOGGER.error("unknown characterestic: ");
 					server.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, new byte[0]);
 				}
-				
 			}
 			
 			@Override
@@ -101,13 +121,34 @@ public class BTResponderSetup {
 				if(Config.DEBUG) {
 					LOGGER.debug( "got request write: {}", Arrays.toString(value));
 				}
+				NfcMessage input = new NfcMessage(value);
+				//byte[] response = responder.processIncomingData(value);
+				NfcMessage output = responder.processIncomingData(input);
+				seq.set(output.sequenceNumber());
 				
-				byte[] response = responder.processIncomingData(value);
-				queue.offer(response);
-				server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
-				if(Config.DEBUG) {
-					LOGGER.debug( "send back: {}", Arrays.toString(response));
+				if(output.isGetNextFragment()) {
+					server.sendResponse(device, requestId, BTInitiatorSetup.GET_NEXT_FRAGMENT, 0, new byte[0]);
+					if(Config.DEBUG) {
+						LOGGER.debug( "indicate fragment");
+					}
+				} else if (output.isPollingResponse()) {
+					server.sendResponse(device, requestId, BTInitiatorSetup.POLLING_RESPONSE, 0, new byte[0]);
+					if(Config.DEBUG) {
+						LOGGER.debug( "indicate polling response");
+					}
+				} else if (output.isPollingRequest()) {
+					server.sendResponse(device, requestId, BTInitiatorSetup.POLLING_REQUEST, 0, new byte[0]);
+					if(Config.DEBUG) {
+						LOGGER.debug( "indicate polling request");
+					}
+				} else {
+					queue.offer(output.bytes());
+					server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
+					if(Config.DEBUG) {
+						LOGGER.debug( "send back: {}", output);
+					}
 				}
+					
 			}
 			
 			@Override
@@ -115,7 +156,7 @@ public class BTResponderSetup {
 				if(Config.DEBUG) {
 					LOGGER.debug( "MTU changed to {}", mtu);
 				}
-				responder.setMtu(mtu); 
+				responder.setMtu(mtu - BTInitiatorSetup.BT_OVERHEAD); 
 			}
 			
 			
@@ -130,10 +171,13 @@ public class BTResponderSetup {
 		
 		BluetoothGattService service = new BluetoothGattService(localUUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 	    
-		BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
-				COINBLESK_CHARACTERISTIC_UUID, BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ ,
+		BluetoothGattCharacteristic characteristicClassic = new BluetoothGattCharacteristic(
+				COINBLESK_CHARACTERISTIC_UUID_CLASSIC, BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ ,
 				BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ);
-		service.addCharacteristic(characteristic);
+		BluetoothGattCharacteristic characteristicFastRead = new BluetoothGattCharacteristic(
+				COINBLESK_CHARACTERISTIC_UUID_FAST_READ, BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ);
+		service.addCharacteristic(characteristicClassic);
+		service.addCharacteristic(characteristicFastRead);
 		server.addService(service);
 		
 		startLeAdvertising(bluetoothAdapter, localUUID);

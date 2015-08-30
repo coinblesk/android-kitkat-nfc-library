@@ -1,8 +1,6 @@
 package ch.uzh.csg.btlib;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -19,7 +17,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -32,6 +29,7 @@ import ch.uzh.csg.comm.Config;
 import ch.uzh.csg.comm.NfcInitiator;
 import ch.uzh.csg.comm.NfcInitiatorHandler;
 import ch.uzh.csg.comm.NfcMessage;
+import ch.uzh.csg.comm.NfcMessage.Type;
 import ch.uzh.csg.comm.NfcTransceiver;
 
 public class BTInitiatorSetup {
@@ -46,7 +44,13 @@ public class BTInitiatorSetup {
 	final private NfcInitiatorHandler initiatorHandler;
 	//final private UUID localUUID;
 	
+	//status that will not occur here are repurposed
+	public static final int GET_NEXT_FRAGMENT = BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
+	public static final int POLLING_RESPONSE = BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION;
+	public static final int POLLING_REQUEST = BluetoothGatt.GATT_READ_NOT_PERMITTED;
 	
+	public static final int INITIAL_SIZE = 517;
+	public static final int BT_OVERHEAD = 3;
     
     private static BTInitiatorSetup instance = null;
     
@@ -65,7 +69,7 @@ public class BTInitiatorSetup {
 		this.mHandler = new Handler();
 	}
 	
-	private void btleDiscovered(final NfcTransceiver nfcTransceiver) throws Exception {
+	private void btleDiscovered(final NfcTransceiver nfcTransceiver) {
 		initiatorHandler.btleDiscovered(new BTLEController() {
 			@Override
 			public void startBTLE() {
@@ -88,8 +92,7 @@ public class BTInitiatorSetup {
 			public void onScanResult(int callbackType, ScanResult result) {
 				// if(result.)
 				if(Config.DEBUG) {
-					LOGGER.debug( "scan result1: {}", callbackType);
-					LOGGER.debug( "scan result2: {}", result.getDevice());
+					LOGGER.debug( "scan result1: {}, {}", callbackType, result.getDevice());
 				}
 				sc.stopScan(this);
 				connect(activity, result.getDevice(), remoteUUID);
@@ -118,12 +121,13 @@ public class BTInitiatorSetup {
 	//we must scan and cannot call connect directly
 	private void connect(Activity activity, BluetoothDevice device, final UUID remoteUUID) {
 		//this is currently the max value on Android
-		final AtomicInteger mtu = new AtomicInteger(1034);
+		final AtomicInteger mtu = new AtomicInteger(INITIAL_SIZE);
 		final AtomicInteger seq = new AtomicInteger(0);
 		device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
 			private BlockingQueue<byte[]> msg = new SynchronousQueue<>();
-			private BluetoothGattCharacteristic car = null;
+			private BluetoothGattCharacteristic carClassic = null;
+			private BluetoothGattCharacteristic carFastRead = null;
 			
 			@Override
 			public void onMtuChanged(BluetoothGatt gatt, int mtu2, int status) {
@@ -138,7 +142,7 @@ public class BTInitiatorSetup {
 						LOGGER.debug( "mtu was set to: {}", mtu2);
 					}
 				}
-				initiator.setmaxTransceiveLength(mtu2);
+				initiator.setmaxTransceiveLength(mtu2 - BT_OVERHEAD);
 				gatt.discoverServices();
 				
 			}
@@ -147,11 +151,13 @@ public class BTInitiatorSetup {
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
 					int newState) {
 				if (newState == BluetoothGatt.STATE_CONNECTED) {
-					gatt.requestMtu(517);
+					gatt.requestMtu(mtu.get());
+			    } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+			    	initiatorHandler.btTagLost();
 			    }
 			}
 			
-			//negotiating is not working currently
+			//TODO: negotiating is not working currently, BT is crashing on the attempt
 			/*private void tryRequestMtu(final BluetoothGatt gatt, final int nr, final int mtu, final int sleepMillis) {
 				mHandler.post(new Runnable() {				
 					@Override
@@ -189,93 +195,92 @@ public class BTInitiatorSetup {
 					}
 					
 					final BluetoothGattService ser = gatt.getService(remoteUUID);
-					car = ser.getCharacteristic(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID);
-					//enable indication, see
-					//http://stackoverflow.com/questions/27068673/subscribe-to-a-ble-gatt-notification-android
-					//http://developer.android.com/guide/topics/connectivity/bluetooth-le.html#notification
-					/*gatt.setCharacteristicNotification(car, true);
-					UUID uuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-					BluetoothGattDescriptor descriptor = car.getDescriptor(uuid);
-					descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
-					boolean retVal = gatt.writeDescriptor(descriptor);
-					if(Config.DEBUG) {
-						LOGGER.debug( "enable indication: {}", retVal);
-					}*/
+					carClassic = ser.getCharacteristic(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID_CLASSIC);
+					if(carClassic == null) {
+						initiator.getInitiatorHandler().handleFailed("Characteristic is null");
+						return;
+					}
 					
-					new Thread(new Runnable() {
-						
+					//optional
+					carFastRead = ser.getCharacteristic(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID_FAST_READ);
+					if(Config.DEBUG) {
+						LOGGER.debug( "read fast characteristic init: {}", carFastRead);
+					}
+					
+					btleDiscovered(new NfcTransceiver() {
+
 						@Override
-						public void run() {
-							try {
-							btleDiscovered(new NfcTransceiver() {
-								
-								@Override
-								public byte[] write(byte[] input) throws Exception {
-									if(car == null) {
-										throw new IOException("Characteristic is null");
-									}
-									car.setValue(input);
-									seq.set(NfcMessage.sequence(input));
-									for(int i=0;i<10;i++) {
-										if(gatt.writeCharacteristic(car)) {
-											if(Config.DEBUG) {
-												LOGGER.debug( "wrote characteristic: success");
-												//boolean retVal = gatt.readCharacteristic(car);
-												//LOGGER.debug( "read characteristic: {}", retVal);
-											}
-											break;
-										} else {
-											if(Config.DEBUG) {
-												LOGGER.debug( "wrote characteristic: failed");
-											}
-											Thread.sleep(100);
-										}
-									}
-				
-									return msg.poll(10, TimeUnit.SECONDS);
+						public byte[] write(byte[] input) throws Exception {
+							seq.set(NfcMessage.sequence(input));
+							if(carFastRead != null && NfcMessage.type(input) == Type.FRAGMENT && NfcMessage.isEmpty(input)) {
+								if(Config.DEBUG) {
+									LOGGER.debug( "read fast characteristic");
 								}
-								
-								@Override
-								public int maxLen() {
-									//not used, as we don't do a handshake
-									return mtu.get();
+								boolean read = gatt.readCharacteristic(carFastRead);
+								if(Config.DEBUG) {
+									LOGGER.debug( "read fast characteristic: {}", read);
 								}
-								
-								@Override
-								public void close() {
-									gatt.close();
+							} else {
+								carClassic.setValue(input);
+								boolean write = gatt.writeCharacteristic(carClassic);
+								if(Config.DEBUG) {
+									LOGGER.debug( "wrote characteristic: {}", write);
 								}
-							});
-							} catch (Exception e) {
-								initiatorHandler.handleFailed(e.toString());
 							}
-							
+				
+							return msg.poll(10, TimeUnit.SECONDS);
 						}
-					}).start();
+
+						@Override
+						public int maxLen() {
+							//not used, as we don't do a handshake
+							return mtu.get();
+						}
+
+						@Override
+						public void close() {
+							gatt.close();
+						}		
+						
+					});		
 					
 				} else {		       
-					car = null;
+					initiator.getInitiatorHandler().handleFailed("Characteristic not discovered: " + status);
 				}
 			}
 			
-			@Override
+			/*@Override
 			public void onDescriptorWrite(final BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
 				if(Config.DEBUG) {
 					LOGGER.debug( "subscribtion request done: {}", status);
 				}
 				//car.setValue(NfcMessage.BTLE_INIT);
 				
-			}
+			}*/
 			
 			@Override
 			public void onCharacteristicWrite(BluetoothGatt gatt,
 					BluetoothGattCharacteristic characteristic, int status) {
 				if(Config.DEBUG) {
-					LOGGER.debug( "characteristic request done: {}", status);
+					LOGGER.debug( "characteristic request done: {}, {}, {}", status, BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH, BluetoothGatt.GATT_SUCCESS);
 				}
 				
-				boolean retVal = gatt.readCharacteristic(car);
-				LOGGER.debug( "read characteristic: {}", retVal);
+				if(status == GET_NEXT_FRAGMENT) {
+					NfcMessage m = new NfcMessage(Type.FRAGMENT);
+					m.sequenceNumber(seq.get());
+					msg.offer(m.bytes());
+				} else if(status == POLLING_RESPONSE) {
+					NfcMessage m = new NfcMessage(Type.POLLING_RESPONSE);
+					m.sequenceNumber(seq.get());
+					msg.offer(m.bytes());
+				} else if(status == POLLING_REQUEST) {
+					NfcMessage m = new NfcMessage(Type.POLLING_REQUEST);
+					m.sequenceNumber(seq.get());
+					msg.offer(m.bytes());
+				} else {
+					boolean retVal = gatt.readCharacteristic(carClassic);
+					LOGGER.debug( "read characteristic: {}", retVal);
+				}
 			}
 			@Override
 			public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
@@ -286,13 +291,13 @@ public class BTInitiatorSetup {
 				msg.offer(characteristic.getValue());
 			}
 			
-			@Override
+			/*@Override
 			public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
 				if(Config.DEBUG) {
 					LOGGER.debug( "got reply back characteristic: {}", Arrays.toString(characteristic.getValue()));
 				}
 				msg.offer(characteristic.getValue());
-			}
+			}*/
 		});
 	}
 	
