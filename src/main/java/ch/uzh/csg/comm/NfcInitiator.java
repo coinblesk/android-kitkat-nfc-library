@@ -15,6 +15,7 @@ public class NfcInitiator {
 	private static final Logger LOGGER = LoggerFactory.getLogger(NfcInitiator.class);
 
 	private final NfcInitiatorHandler initiatorHandler;
+	private final static String INV_SEQ = "invalid sequence";
 	
 	// state
 	private final Deque<NfcMessage> messageQueue = new ConcurrentLinkedDeque<NfcMessage>();
@@ -22,7 +23,7 @@ public class NfcInitiator {
 	private NfcMessage lastMessageSent;
 
 	private volatile boolean initiating = true;
-	private volatile boolean first = false;
+	private volatile boolean first = true;
 	
 	public NfcInitiator(NfcInitiatorHandler initiatorHandler) {
 		this.initiatorHandler = initiatorHandler;
@@ -49,26 +50,58 @@ public class NfcInitiator {
 						nfcTransceiver.close();
 						return;
 					}
+					boolean resume = false;
 					if(handshake) {
 						try {
-							handshake(nfcTransceiver);
+							resume = handshake(nfcTransceiver);
+						} catch (NfcLibException e) {
+							if (Config.DEBUG) {
+								LOGGER.debug( "tag lost after handshake", e);
+							}
+							return;
 						} catch (IOException e) {
-							initiatorHandler.handleFailed(e.toString());
+							e.printStackTrace();
+							tagFailed(e.toString());
 							return;
 						}
 					}
 					initiatorHandler.handleStatus("handshake complete");
 					// check if we should resume
 					if (!messageQueue.isEmpty()) {
+						if (Config.DEBUG) {
+							LOGGER.debug("We still have data over here: {}", messageQueue.peek());
+						}
+						//if(messageQueue.peek().type() == Type.POLLING_RESPONSE && !resume) {
+							//don't send a polling response if the other party did not indicate to have data
+						//}
 						if (!processMessage(nfcTransceiver)) {
 							if (Config.DEBUG) {
 								LOGGER.debug( "Nothing to do shutdown 2!");
 							}
 							return;
+						} else {
+							LOGGER.debug( "resume ok1");
+						}
+						
+					} else if(resume) { //check if other side should resume
+						// start polling
+						if (Config.DEBUG) {
+							LOGGER.debug( "Start request polling 1. The other party said they still have data");
+						}
+						messageQueue.offer(new NfcMessage(Type.POLLING_RESPONSE));
+						if (!processMessage(nfcTransceiver)) {
+							if (Config.DEBUG) {
+								LOGGER.debug( "Nothing to do shutdown 3!");
+							}
+							return;
+						} else {
+							LOGGER.debug( "resume ok2");
 						}
 					}
+					
 					// get the complete message
 					while (initiatorHandler.hasMoreMessages()) {
+						
 						byte[] message = initiatorHandler.nextMessage();
 						if (message == null) {
 							// start polling
@@ -76,6 +109,12 @@ public class NfcInitiator {
 								LOGGER.debug( "Start polling");
 							}
 							messageQueue.offer(new NfcMessage(Type.POLLING_REQUEST));
+						} else if(message.length == 0) { 
+							// start polling
+							if (Config.DEBUG) {
+								LOGGER.debug( "Start request polling 2");
+							}
+							messageQueue.offer(new NfcMessage(Type.POLLING_RESPONSE));
 						} else {
 
 							// split it
@@ -90,11 +129,13 @@ public class NfcInitiator {
 
 					}
 					
-					if(Config.DEBUG) {
-						LOGGER.debug( "loop done");
-					}
+					
 					
 					if(!continueNFC) {
+						initiating = false;
+						if(Config.DEBUG) {
+							LOGGER.debug( "loop done");
+						}
 						return;
 					}
 
@@ -173,7 +214,7 @@ public class NfcInitiator {
 
 				} catch (Throwable t) {
 					t.printStackTrace();
-					initiatorHandler.handleFailed(t.toString());
+					tagFailed(t.toString());
 					return;
 				}
 
@@ -182,6 +223,7 @@ public class NfcInitiator {
 			@Override
 			public void tagFailed(String message) {
 				initiatorHandler.handleFailed(message);
+				reset();
 			}
 
 			@Override
@@ -200,9 +242,25 @@ public class NfcInitiator {
 				LOGGER.debug( "Tag lost");
 			}
 			return false;
+		} catch (IOException e) {
+			if(INV_SEQ.equals(e.getMessage())) {
+				initiatorHandler.handleFailed(e.toString());
+				//preserv the state as we won't do a handshake
+				boolean firstCopy = first;
+				reset();
+				first = firstCopy;
+				//continue, will resend data
+				return true;
+			} else {
+				e.printStackTrace();
+				initiatorHandler.handleFailed(e.toString());
+				reset();
+				return false;
+			}
 		} catch (Throwable t) {
 			t.printStackTrace();
 			initiatorHandler.handleFailed(t.toString());
+			reset();
 			return false;
 		}
 		messageSplitter.clear();
@@ -210,9 +268,19 @@ public class NfcInitiator {
 	}
 
 	public void reset() {
-		lastMessageSent = null;
-		messageQueue.clear();
-		messageSplitter.clear();
+		try {
+			throw new RuntimeException("call stack");
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+		}
+		if (Config.DEBUG) {
+			LOGGER.debug( "reset state");
+		}
+		synchronized (this) {
+			lastMessageSent = null;
+			messageQueue.clear();
+			messageSplitter.clear();
+		}
 	}
 	
 	public void setFirst(boolean first) {
@@ -223,7 +291,7 @@ public class NfcInitiator {
 		this.initiating = initiating;
 	}
 
-	private void handshake(NfcTransceiver transceiver) throws Exception {
+	private boolean handshake(NfcTransceiver transceiver) throws Exception {
 		if (Config.DEBUG) {
 			LOGGER.debug( "init NFC");
 		}
@@ -244,8 +312,8 @@ public class NfcInitiator {
 		}
 		if (first) {
 			initMessage.first();
-			first = false;
 			reset();
+			first = false;
 		}
 
 		// no sequence number here,initiating.set( as this is a special message
@@ -263,15 +331,17 @@ public class NfcInitiator {
 			LOGGER.error( "handshake header unexpected: {}", responseMessage);
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
-		if (responseMessage.payload().length != 2 + 16) {
+		if (responseMessage.payload().length != 2 + 16 + 1) {
 			LOGGER.error( "handshake payload unexpected: {}", responseMessage);
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
-		final int maxLenOther = Utils.byteArrayToShort(responseMessage.payload(), 0);
+		boolean resume = responseMessage.payload()[0] == 1;
+		final int maxLenOther = Utils.byteArrayToShort(responseMessage.payload(), 1);
 		byte[] uuid = new byte[16];
-		System.arraycopy(responseMessage.payload(), 2, uuid, 0, 16);
+		System.arraycopy(responseMessage.payload(), 3, uuid, 0, 16);
 		initiatorHandler.setUUID(uuid);
 		messageSplitter.maxTransceiveLength(Math.min(maxLenOther, maxLenThis));
+		return resume;
 	}
 	
 	public void setmaxTransceiveLength(int len) {
@@ -285,33 +355,38 @@ public class NfcInitiator {
 		while (!messageQueue.isEmpty()) {
 			final NfcMessage request = messageQueue.peek();
 
-			request.sequenceNumber(lastMessageSent);
-
-			if (Config.DEBUG) {
-				LOGGER.debug( "loop write: {} / {}", request, Arrays.toString(request.bytes()));
-			}
-			byte[] response = transceiver.write(request.bytes());
-
-			if (response == null) {
-				throw new IOException("respones is null, unexpected");
-			}
-			NfcMessage responseMessage = new NfcMessage(response);
-			if (Config.DEBUG) {
-				LOGGER.debug( "loop response: {}", responseMessage);
-			}
-
-			// message successfully sent, remove from queue
-			messageQueue.poll();
-			initiatorHandler.handleStatus("message fragment sent, queue: " + messageQueue.size());
-
-			if (!validateSequence(request, responseMessage)) {
+			final NfcMessage responseMessage;
+			
+			//important to have this an reset synchronized, otherwise lastMessageSent could never be null
+			synchronized (this) {
+				
+				request.sequenceNumber(lastMessageSent);
 				if (Config.DEBUG) {
-					LOGGER.debug( "sequence error {} / {}", request, response);
+					LOGGER.debug( "loop write: {} / {}", request, Arrays.toString(request.bytes()));
 				}
-				throw new IOException("invalid sequence");
-			}
+				byte[] response = transceiver.write(request.bytes());
 
-			lastMessageSent = request;
+				if (response == null) {
+					throw new NfcLibException("tag lost");
+				}
+				responseMessage = new NfcMessage(response);
+				if (Config.DEBUG) {
+					LOGGER.debug( "loop response: {}", responseMessage);
+				}
+
+				if (!validateSequence(request, responseMessage)) {
+					if (Config.DEBUG) {
+						LOGGER.debug( "sequence error {} / {}", request, response);
+					}
+					throw new IOException(INV_SEQ);
+				}
+			
+				// message successfully sent, remove from queue
+				messageQueue.poll();
+				initiatorHandler.handleStatus("message fragment sent, queue: " + messageQueue.size());
+
+				lastMessageSent = request;
+			}
 
 			switch (responseMessage.type()) {
 			case SINGLE:
@@ -348,6 +423,8 @@ public class NfcInitiator {
 				break;
 			case ERROR:
 				throw new IOException("the message " + request + " caused an exception on the other side");
+			case ERROR_REPLY:
+				throw new IOException("the message " + request + " caused an exception on this side");
 			default:
 				throw new IOException("did not expect the type " + responseMessage.type() + " as reply");
 			}

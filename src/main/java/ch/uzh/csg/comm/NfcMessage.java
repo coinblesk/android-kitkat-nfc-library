@@ -96,7 +96,7 @@ public class NfcMessage {
 		final byte Lc2 = (byte) AID_COINBLESK_2.length;
 		final byte Lc3 = (byte) AID_COINBLESK_3.length;
 		// we return 1 + 2 bytes transmission length + 128bit UUID
-		final byte Le = HEADER_LENGTH + 2 + 16;
+		final byte Le = HEADER_LENGTH + 2 + 16 + 1;
 		CLA_INS_P1_P2_COINBLESK_1 = new byte[] { CLA_INS_P1_P2[0], CLA_INS_P1_P2[1], 
 				CLA_INS_P1_P2[2], CLA_INS_P1_P2[3], Lc1, AID_COINBLESK_1[0], AID_COINBLESK_1[1], 
 				AID_COINBLESK_1[2], AID_COINBLESK_1[3], AID_COINBLESK_1[4], AID_COINBLESK_1[5], 
@@ -130,7 +130,7 @@ public class NfcMessage {
 
 	// messages, uses the last 3 bits (bit 0-2), READ_BINARY, AID_1, AID_2, AID_3, NO_COINBLESK_MSG is never sent over the wire
 	public enum Type {
-		FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, ERROR, POLLING_RESPONSE, RESET, UNUSED2, READ_BINARY, AID_1, AID_2, AID_3;
+		FRAGMENT, FRAGMENT_LAST, POLLING_REQUEST, SINGLE, ERROR, POLLING_RESPONSE, ERROR_REPLY, UNUSED2, READ_BINARY, AID_1, AID_2, AID_3;
 	}
 	
 	//Hack for NXP devices that require to have the smallest packet of 2 bytes
@@ -307,6 +307,10 @@ public class NfcMessage {
 	public boolean isError() {
 		return type() == Type.ERROR;
 	}
+	
+	public boolean isErrorReply() {
+		return type() == Type.ERROR_REPLY;
+	}
 
 	/**
 	 * Returns true if the type of this message is read binary.
@@ -430,4 +434,6 @@ public class NfcMessage {
 	public static Type type(byte[] input) {
 		return Type.values()[input[0] & 0x07];
 	}
+
+	
 }

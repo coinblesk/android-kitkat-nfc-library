@@ -80,10 +80,11 @@ final public class Utils {
 	/**
 	 * Merges two byte arrays into one.
 	 */
-	public static byte[] merge(final byte[] array1, final byte[] array2) {
-		final byte[] combined = new byte[array1.length + array2.length];
-		System.arraycopy(array1, 0, combined, 0, array1.length);
-		System.arraycopy(array2, 0, combined, array1.length, array2.length);
+	public static byte[] merge(final byte resume, final byte[] array1, final byte[] array2) {
+		final byte[] combined = new byte[array1.length + array2.length + 1];
+		combined[0] = resume;
+		System.arraycopy(array1, 0, combined, 1, array1.length);
+		System.arraycopy(array2, 0, combined, 1 + array1.length, array2.length);
 		return combined;
 	}
 	

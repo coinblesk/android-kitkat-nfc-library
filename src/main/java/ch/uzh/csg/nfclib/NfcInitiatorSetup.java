@@ -84,11 +84,9 @@ public class NfcInitiatorSetup {
 	 * enable() method must be called first!
 	 * @throws NfcLibException 
 	 */
-	public void startInitiating(Activity activity) {
-		initiator.reset();
+	public void start(Activity activity) {
+		startInitiating();
 		transceiver.turnOn(activity);
-		initiator.setInitiating(true);
-		initiator.setFirst(true);
 	}
 	
 	/**
@@ -99,9 +97,14 @@ public class NfcInitiatorSetup {
 	 * This should be called after a successful communication. Once you want to
 	 * restart the NFC capability, call enableNFC.
 	 */
-	public void stopInitiating(Activity activity) {
+	public void stop(Activity activity) {
 		initiator.setInitiating(false);
 		transceiver.turnOff(activity);
+	}
+	
+	public void startInitiating() {
+		initiator.reset();
+		initiator.setInitiating(true);
 	}
 	
 	

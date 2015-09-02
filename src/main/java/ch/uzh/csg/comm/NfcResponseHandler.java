@@ -33,4 +33,12 @@ public interface NfcResponseHandler {
 
 	public abstract byte[] getUUID();
 
+	public abstract void nfcTagLost();
+
+	public abstract void btTagFound();
+
+	public abstract void btTagLost();
+
+	public abstract void nfcTagFound();
+
 }

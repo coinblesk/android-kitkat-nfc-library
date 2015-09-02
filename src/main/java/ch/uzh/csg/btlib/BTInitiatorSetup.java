@@ -51,6 +51,7 @@ public class BTInitiatorSetup {
 	
 	public static final int INITIAL_SIZE = 517;
 	public static final int BT_OVERHEAD = 3;
+	final private AtomicInteger mtu = new AtomicInteger(INITIAL_SIZE);
     
     private static BTInitiatorSetup instance = null;
     
@@ -70,13 +71,15 @@ public class BTInitiatorSetup {
 	}
 	
 	private void btleDiscovered(final NfcTransceiver nfcTransceiver) {
-		initiatorHandler.btleDiscovered(new BTLEController() {
+		initiatorHandler.btTagFound(new BTLEController() {
 			@Override
 			public void startBTLE() {
 				if(Config.DEBUG) {
 					LOGGER.debug( "start BT");
 				}
+				initiator.setmaxTransceiveLength(mtu.get() - BT_OVERHEAD);
 				initiator.tagDiscoverHandler().tagDiscovered(nfcTransceiver, false, false);
+				
 			}
 		});
 		
@@ -121,7 +124,7 @@ public class BTInitiatorSetup {
 	//we must scan and cannot call connect directly
 	private void connect(Activity activity, BluetoothDevice device, final UUID remoteUUID) {
 		//this is currently the max value on Android
-		final AtomicInteger mtu = new AtomicInteger(INITIAL_SIZE);
+		
 		final AtomicInteger seq = new AtomicInteger(0);
 		device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
@@ -141,8 +144,8 @@ public class BTInitiatorSetup {
 					if(Config.DEBUG) {
 						LOGGER.debug( "mtu was set to: {}", mtu2);
 					}
+					mtu.set(mtu2);
 				}
-				initiator.setmaxTransceiveLength(mtu2 - BT_OVERHEAD);
 				gatt.discoverServices();
 				
 			}
@@ -220,11 +223,19 @@ public class BTInitiatorSetup {
 								if(Config.DEBUG) {
 									LOGGER.debug( "read fast characteristic: {}", read);
 								}
+								if(!read) {
+									initiatorHandler.btTagLost();
+									return null;
+								}
 							} else {
 								carClassic.setValue(input);
 								boolean write = gatt.writeCharacteristic(carClassic);
 								if(Config.DEBUG) {
 									LOGGER.debug( "wrote characteristic: {}", write);
+								}
+								if(!write) {
+									initiatorHandler.btTagLost();
+									return null;
 								}
 							}
 				

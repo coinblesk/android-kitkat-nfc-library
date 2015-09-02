@@ -18,8 +18,6 @@ public interface NfcTransceiver {
 
 	
 
-	
-
 	/**
 	 * Writes a {@link NfcMessage} to the NFC partner.
 	 * 

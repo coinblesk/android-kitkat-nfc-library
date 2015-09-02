@@ -57,6 +57,10 @@ public class NfcResponder {
 		lastMessageReceived = null;	
 	}
 	
+	public NfcResponseHandler getResponseHandler() {
+		return responseHandler;
+	}
+	
 	public byte[] processIncomingData(byte[] input) {
 		NfcMessage inputMessage = new NfcMessage(input);
 		return processIncomingData(inputMessage).bytes();
@@ -68,6 +72,7 @@ public class NfcResponder {
 		}
 		
 		if(inputMessage.isFirst()) {
+			LOGGER.debug( "first message, reset state");
 			reset();
 		}
 		
@@ -89,7 +94,7 @@ public class NfcResponder {
 			maxLen = Math.min(Short.MAX_VALUE, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
-			merged = Utils.merge(array, responseHandler.getUUID());
+			merged = Utils.merge((byte) (messageQueue.isEmpty()? 0: 1), array, responseHandler.getUUID());
 			return new NfcMessage(Type.SINGLE).payload(merged);
 		case AID_2:
 			if (Config.DEBUG) {
@@ -98,7 +103,7 @@ public class NfcResponder {
 			maxLen = Math.min(53, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
-			merged = Utils.merge(array, responseHandler.getUUID());
+			merged = Utils.merge((byte) (messageQueue.isEmpty()? 0: 1), array, responseHandler.getUUID());
 			return new NfcMessage(Type.SINGLE).payload(merged);
 		case AID_3:
 			if (Config.DEBUG) {
@@ -107,7 +112,7 @@ public class NfcResponder {
 			maxLen = Math.min(245, maxTransceiveLength);
 			messageSplitter.maxTransceiveLength(maxLen);
 			array = Utils.shortToByteArray((short)maxLen);
-			merged = Utils.merge(array, responseHandler.getUUID());
+			merged = Utils.merge((byte) (messageQueue.isEmpty()? 0: 1), array, responseHandler.getUUID());
 			return new NfcMessage(Type.SINGLE).payload(merged);
 		default:
 			if (Config.DEBUG) {
@@ -123,30 +128,42 @@ public class NfcResponder {
 							(lastMessageReceived == null ? -1 : lastMessageReceived.sequenceNumber()));
 				
 				
-				responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
+				responseHandler.handleFailed(NfcInitiatorSetup.INVALID_SEQUENCE);
 				outputMessage = new NfcMessage(Type.ERROR);
-				return prepareWrite(outputMessage);
+				NfcMessage msg = prepareWrite(outputMessage);
+				reset();
+				return msg;
 			}
 			if (!check && repeat) {
+				if (Config.DEBUG) {
+					LOGGER.debug( "repeat last message {}", lastMessageSent);
+				}
 				lastMessageReceived = inputMessage;
 				return lastMessageSent;
 			}
 			try {
 				outputMessage = handleRequest(inputMessage);
 				lastMessageReceived = inputMessage;
-				return prepareWrite(outputMessage);
+				NfcMessage msg = prepareWrite(outputMessage);
+				if(msg.isError() || msg.isErrorReply()) {
+					reset();
+				}
+				return msg;
 			} catch (Exception e){
-			    
-				reset();
+			    e.printStackTrace();
 				responseHandler.handleFailed(e.toString());
-				return new NfcMessage(Type.ERROR);
+				outputMessage = new NfcMessage(Type.ERROR);
+				NfcMessage msg = prepareWrite(outputMessage);
+				reset();
+				return msg;
 			}
 			
 		}
 		
 	}
 	
-	private void reset() {
+	public void reset() {
+		LOGGER.debug( "reset state");
 		lastMessageSent = null;
 		lastMessageReceived = null;
 		lateMessage = null;
@@ -180,11 +197,10 @@ public class NfcResponder {
 
 		if (incoming.isError()) {
 			if (Config.DEBUG) {
-				LOGGER.debug( "nfc error reported - returning null");
+				LOGGER.debug( "nfc error reported - returning error response");
 			}
-			reset();
 			responseHandler.handleFailed(NfcInitiatorSetup.UNEXPECTED_ERROR);
-			return null;
+			return new NfcMessage(Type.ERROR_REPLY);
 		}
 
 		switch (incoming.type()) {
@@ -205,7 +221,6 @@ public class NfcResponder {
 						messageSplitter.clear();
 						return response(receivedData);
 					default:
-						reset();
 						responseHandler.handleFailed("unexpected type");
 						return new NfcMessage(Type.ERROR);
 				}
@@ -280,7 +295,6 @@ public class NfcResponder {
 		
 		if (messageQueue.isEmpty()) {
 			LOGGER.error( "nothing to return - message queue is empty");
-			reset();
 			responseHandler.handleFailed("nothing to return - message queue is empty");
 			return new NfcMessage(Type.ERROR);
 		}
@@ -299,7 +313,7 @@ public class NfcResponder {
 			LOGGER.debug( "deactivated due to {} ({})", 
 					(reason == HostApduService.DEACTIVATION_LINK_LOSS ? "link loss" : "deselected"), reason);
 		}
-		responseHandler.handleFailed(NfcInitiatorSetup.TIMEOUT);
+		responseHandler.nfcTagLost();
 	}
 
 	public void setMtu(int mtu) {

@@ -1,6 +1,5 @@
 ch/uzh/csg/nfclib/ACSNfcTransceiver$1.class
 ch/uzh/csg/nfclib/AndroidNfcTransceiver.class
-ch/uzh/csg/comm/ReplyCallback.class
 ch/uzh/csg/comm/TagDiscoverHandler.class
 ch/uzh/csg/nfclib/AndroidNfcTransceiver$AndroidTransceiver.class
 ch/uzh/csg/nfclib/NfcInitiatorSetup.class

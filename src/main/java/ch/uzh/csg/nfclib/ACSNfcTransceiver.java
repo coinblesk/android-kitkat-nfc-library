@@ -268,7 +268,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 					LOGGER.debug( "could not write message - return value is 0");
 				}
 				//most likely due to tag lost
-				throw new IOException(UNEXPECTED_ERROR);
+				throw new NfcLibException("connection seems to be lost");
 			}
 
 			byte[] received = new byte[length];

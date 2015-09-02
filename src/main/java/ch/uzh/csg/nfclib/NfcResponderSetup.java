@@ -52,6 +52,7 @@ public class NfcResponderSetup  {
 	final public class AppBroadcastReceiver extends BroadcastReceiver {
 		
 		final private NfcResponder responder;
+		private volatile boolean nfcPresent = false;
 		public AppBroadcastReceiver(final NfcResponder responder) {
 			this.responder = responder;
 		}
@@ -63,9 +64,15 @@ public class NfcResponderSetup  {
         	}
         	final byte[] responseApdu = intent.getExtras().getByteArray(HostApduServiceNfcLib.NFC_SERVICE_SEND_DATA);
         	if(responseApdu != null) {
+        		if(!nfcPresent) {
+        			responder.getResponseHandler().nfcTagFound();
+        			nfcPresent = true;
+        			
+        		}
         		byte[] processed = responder.processIncomingData(responseApdu);
         		sendBroadcast(context, processed);
         	} else {
+        		nfcPresent = false;
         		final int reason = intent.getExtras().getInt(HostApduServiceNfcLib.NFC_SERVICE_SEND_DEACTIVATE);
         		responder.onDeactivated(reason);
         	}

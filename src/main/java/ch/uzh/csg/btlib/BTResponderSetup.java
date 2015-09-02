@@ -35,6 +35,8 @@ public class BTResponderSetup {
 	final public static UUID COINBLESK_CHARACTERISTIC_UUID_CLASSIC = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac8");
 	final public static UUID COINBLESK_CHARACTERISTIC_UUID_FAST_READ = UUID.fromString("90b26ed7-7200-40ee-9707-5becce10aac9");
 	
+	final private AtomicInteger mtu = new AtomicInteger(0);
+	
 	private final UUID localUUID;
 	
 	final private static AdvertiseSettings ADVERTISE_SETTINGS = new AdvertiseSettings.Builder()
@@ -87,6 +89,8 @@ public class BTResponderSetup {
 					BluetoothGattCharacteristic characteristic) {
 				if(characteristic.getUuid().equals(BTResponderSetup.COINBLESK_CHARACTERISTIC_UUID_FAST_READ)) {
 					
+					responder.setMtu(mtu.get() - BTInitiatorSetup.BT_OVERHEAD); 
+					
 					NfcMessage input = new NfcMessage(Type.FRAGMENT);
 					input.sequenceNumber(seq.get() + 1);
 					NfcMessage output = responder.processIncomingData(input);
@@ -121,6 +125,9 @@ public class BTResponderSetup {
 				if(Config.DEBUG) {
 					LOGGER.debug( "got request write: {}", Arrays.toString(value));
 				}
+				
+				responder.setMtu(mtu.get() - BTInitiatorSetup.BT_OVERHEAD); 
+				
 				NfcMessage input = new NfcMessage(value);
 				//byte[] response = responder.processIncomingData(value);
 				NfcMessage output = responder.processIncomingData(input);
@@ -152,11 +159,11 @@ public class BTResponderSetup {
 			}
 			
 			@Override
-			public void onMtuChanged(BluetoothDevice device, int mtu) {
+			public void onMtuChanged(BluetoothDevice device, int mtu2) {
 				if(Config.DEBUG) {
 					LOGGER.debug( "MTU changed to {}", mtu);
 				}
-				responder.setMtu(mtu - BTInitiatorSetup.BT_OVERHEAD); 
+				mtu.set(mtu2);
 			}
 			
 			
@@ -165,6 +172,11 @@ public class BTResponderSetup {
 					int status, int newState) {
 				if(Config.DEBUG) {
 					LOGGER.debug( "connected: {} / {}", newState, BluetoothGatt.STATE_CONNECTED);
+				}
+				if (newState == BluetoothGatt.STATE_CONNECTED) {
+					responder.getResponseHandler().btTagFound();
+				} else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+					responder.getResponseHandler().btTagLost();
 				}
 			}
 		});
