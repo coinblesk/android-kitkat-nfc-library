@@ -60,6 +60,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 	private final BroadcastReceiver broadcastReceiver;*/
 	
 	private final TagDiscoverHandler nfcInit;
+	private final NfcInitiatorHandler initiatorHandler;
 	
 	private BroadcastReceiver broadcastReceiver;
 	private Reader reader;
@@ -77,12 +78,13 @@ public class ACSNfcTransceiver implements NfcTrans {
 	 *            a NFC connection is established (may not be null)
 	 * @throws NfcLibException 
 	 */
-	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit, final Context context) {
+	public ACSNfcTransceiver(final TagDiscoverHandler nfcInit, final NfcInitiatorHandler initiatorHandler, final Context context) {
 		this.nfcInit = nfcInit;
+		this.initiatorHandler = initiatorHandler;
 	}
 	
 	private static void setOnStateChangedListener(final Reader reader, 
-			final TagDiscoverHandler nfcInit, final ACSTransceiver transceiver) {
+			final TagDiscoverHandler nfcInit, final NfcInitiatorHandler initiatorHandler, final ACSTransceiver transceiver) {
 		
 		if (Config.DEBUG) {
 			LOGGER.debug( "set listener");
@@ -101,13 +103,14 @@ public class ACSNfcTransceiver implements NfcTrans {
 							transceiver.disableBuzzer();
 							disabledBuzzer = true;
 						}
+						initiatorHandler.nfcTagFound();
 						nfcInit.tagDiscovered(transceiver, true, true);
 					} catch (ReaderException e) {
 						LOGGER.error( "Could not connnect reader (ReaderException): ", e);
 						nfcInit.tagFailed(NfcEvent.INIT_FAILED.name());
 					}
 				} else if(currState == Reader.CARD_ABSENT) {
-					nfcInit.tagLost(transceiver);
+					initiatorHandler.nfcTagLost();
 				}
 			}
 		});
@@ -359,7 +362,7 @@ public class ACSNfcTransceiver implements NfcTrans {
 			filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
 			
 			broadcastReceiver = createBroadcastReceiver(reader, nfcInit/*, callback*/, transceiver);
-			setOnStateChangedListener(reader, nfcInit, transceiver);
+			setOnStateChangedListener(reader, nfcInit, initiatorHandler, transceiver);
 			activity.registerReceiver(broadcastReceiver, filter);
 			broadcastReceiverRegistered = true;
 		}

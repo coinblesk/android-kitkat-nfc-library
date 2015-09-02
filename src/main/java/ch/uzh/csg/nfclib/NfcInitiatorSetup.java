@@ -61,9 +61,9 @@ public class NfcInitiatorSetup {
 	public NfcInitiatorSetup(final NfcInitiatorHandler initiatorHandler, final Context context) throws NfcLibException {
 		this.initiator = new NfcInitiator(initiatorHandler);
 		if (hasClass("com.acs.smartcard.Reader") && ACSNfcTransceiver.isExternalReaderAttached(context)) {
-			transceiver = new ACSNfcTransceiver(initiator.tagDiscoverHandler(), context);
+			transceiver = new ACSNfcTransceiver(initiator.tagDiscoverHandler(), initiatorHandler, context);
 		} else {
-			transceiver = new AndroidNfcTransceiver(initiator.tagDiscoverHandler(), context);
+			transceiver = new AndroidNfcTransceiver(initiator.tagDiscoverHandler(), initiatorHandler, context);
 		}
 	}
 	

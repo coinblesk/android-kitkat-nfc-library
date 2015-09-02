@@ -45,15 +45,19 @@ public class BTInitiatorSetup {
 	//final private UUID localUUID;
 	
 	//status that will not occur here are repurposed
+	//don't use permission or encryption, or the device will get bonded automatically:
+	//http://stackoverflow.com/questions/24645519/android-how-can-i-make-ble-device-to-paired-device-bonded
 	public static final int GET_NEXT_FRAGMENT = BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
-	public static final int POLLING_RESPONSE = BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION;
-	public static final int POLLING_REQUEST = BluetoothGatt.GATT_READ_NOT_PERMITTED;
+	public static final int POLLING_RESPONSE = BluetoothGatt.GATT_INVALID_OFFSET;
+	public static final int POLLING_REQUEST = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
 	
 	public static final int INITIAL_SIZE = 517;
 	public static final int BT_OVERHEAD = 3;
 	final private AtomicInteger mtu = new AtomicInteger(INITIAL_SIZE);
     
     private static BTInitiatorSetup instance = null;
+    
+    private BluetoothGatt gatt;
     
     public static BTInitiatorSetup init(final NfcInitiator initiator, 
     		final Activity activity,  BluetoothAdapter bluetoothAdapter) {
@@ -84,6 +88,24 @@ public class BTInitiatorSetup {
 		});
 		
 	}
+	
+	public boolean isOpen() {
+		return gatt!=null;
+	}
+	
+	public void close() {
+		if(Config.DEBUG) {
+			LOGGER.debug( "try close device");
+		}
+		if(gatt!=null) {
+			gatt.close();
+			if(Config.DEBUG) {
+				LOGGER.debug( "device closed");
+			}
+			gatt=null;
+		}
+	}
+	
 	
 	public void scanLeDevice(final Activity activity, final UUID remoteUUID) {
 		if(Config.DEBUG) {
@@ -124,7 +146,6 @@ public class BTInitiatorSetup {
 	//we must scan and cannot call connect directly
 	private void connect(Activity activity, BluetoothDevice device, final UUID remoteUUID) {
 		//this is currently the max value on Android
-		
 		final AtomicInteger seq = new AtomicInteger(0);
 		device.connectGatt(activity, false, new BluetoothGattCallback() {
 			
@@ -154,9 +175,11 @@ public class BTInitiatorSetup {
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
 					int newState) {
 				if (newState == BluetoothGatt.STATE_CONNECTED) {
+					BTInitiatorSetup.this.gatt = gatt;
 					gatt.requestMtu(mtu.get());
 			    } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
 			    	initiatorHandler.btTagLost();
+			    	BTInitiatorSetup.this.gatt = null;
 			    }
 			}
 			
@@ -229,6 +252,9 @@ public class BTInitiatorSetup {
 								}
 							} else {
 								carClassic.setValue(input);
+								if(Config.DEBUG) {
+									LOGGER.debug( "wrote characteristic");
+								}
 								boolean write = gatt.writeCharacteristic(carClassic);
 								if(Config.DEBUG) {
 									LOGGER.debug( "wrote characteristic: {}", write);

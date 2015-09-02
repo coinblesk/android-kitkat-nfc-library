@@ -38,6 +38,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	public static final int MAX_WRITE_LENGTH = 245;
 	private final TagDiscoverHandler nfcInit;
 	private final NfcAdapter nfcAdapter;
+	private final NfcInitiatorHandler initiatorHandler;
 	
 	/*
 	 * not sure if this is called from different threads. Make it volatile just
@@ -57,8 +58,9 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 	 * @param executorService 
 	 * @throws NfcLibException 
 	 */
-	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, Context context) throws NfcLibException {
+	public AndroidNfcTransceiver(TagDiscoverHandler nfcInit, final NfcInitiatorHandler initiatorHandler, Context context) throws NfcLibException {
 		this.nfcInit = nfcInit;
+		this.initiatorHandler = initiatorHandler;
 		//this.activity = activity;
 		this.nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(context);
 		//this.executorService = executorService;
@@ -78,7 +80,8 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		 
 		try {
 			isoDep.connect();
-			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter, nfcInit);
+			final NfcTransceiver transceiver = new AndroidTransceiver(isoDep, nfcAdapter, initiatorHandler);
+			initiatorHandler.nfcTagFound();
 			nfcInit.tagDiscovered(transceiver, true, true);
 		} catch (IOException e) {
 			LOGGER.error( "Could not connnect isodep: ", e);
@@ -90,12 +93,12 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 		
 		final private IsoDep isoDep;
 		final private NfcAdapter nfcAdapter;
-		final private TagDiscoverHandler nfcInit;
+		final private NfcInitiatorHandler initiatorHandler;
 				
-		private AndroidTransceiver(IsoDep isoDep, NfcAdapter nfcAdapter, TagDiscoverHandler nfcInit) {
+		private AndroidTransceiver(IsoDep isoDep, NfcAdapter nfcAdapter, final NfcInitiatorHandler initiatorHandler) {
 			this.isoDep = isoDep;
 			this.nfcAdapter = nfcAdapter;
-			this.nfcInit = nfcInit;
+			this.initiatorHandler = initiatorHandler;
 		}
 
 		@Override
@@ -125,7 +128,7 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 				return retVal;
 			} catch (IOException | IllegalStateException e) {
 				e.printStackTrace();
-				nfcInit.tagLost(this);
+				initiatorHandler.nfcTagLost();
 				isoDep.close();
 				throw new NfcLibException("connection seems to be lost: ", e);
 			}

@@ -41,7 +41,6 @@ public class NfcInitiator {
 				if (Config.DEBUG) {
 					LOGGER.debug( "Tag detected!");
 				}
-				initiatorHandler.nfcTagFound();
 				try {			
 					if (!initiating) {
 						if (Config.DEBUG) {
@@ -136,6 +135,7 @@ public class NfcInitiator {
 						if(Config.DEBUG) {
 							LOGGER.debug( "loop done");
 						}
+						initiatorHandler.protocolDone();
 						return;
 					}
 
@@ -210,6 +210,7 @@ public class NfcInitiator {
 						if (Config.DEBUG) {
 							LOGGER.debug( "loop done");
 						}
+						initiatorHandler.protocolDone();
 					}
 
 				} catch (Throwable t) {
@@ -225,12 +226,6 @@ public class NfcInitiator {
 				initiatorHandler.handleFailed(message);
 				reset();
 			}
-
-			@Override
-			public void tagLost(NfcTransceiver nfcTransceiver) {
-				LOGGER.debug("Tag lost");
-				initiatorHandler.nfcTagLost();
-			}
 		};
 	}
 
@@ -239,7 +234,7 @@ public class NfcInitiator {
 			messageLoop(transceiver);
 		} catch (NfcLibException e) {
 			if (Config.DEBUG) {
-				LOGGER.debug( "Tag lost");
+				LOGGER.debug( "Tag lost {}", e);
 			}
 			return false;
 		} catch (IOException e) {
@@ -310,6 +305,7 @@ public class NfcInitiator {
 		default:
 			throw new IOException(NfcEvent.INIT_FAILED.name());
 		}
+		final boolean firstCopy = first;
 		if (first) {
 			initMessage.first();
 			reset();
@@ -339,7 +335,7 @@ public class NfcInitiator {
 		final int maxLenOther = Utils.byteArrayToShort(responseMessage.payload(), 1);
 		byte[] uuid = new byte[16];
 		System.arraycopy(responseMessage.payload(), 3, uuid, 0, 16);
-		initiatorHandler.setUUID(uuid);
+		initiatorHandler.setUUID(uuid, firstCopy);
 		messageSplitter.maxTransceiveLength(Math.min(maxLenOther, maxLenThis));
 		return resume;
 	}

@@ -35,7 +35,7 @@ public interface NfcInitiatorHandler {
 
 	public abstract byte[] nextMessage() throws Exception;
 
-	public abstract void setUUID(byte[] uuid);
+	public abstract void setUUID(byte[] uuid, boolean first);
 
 	public abstract void btTagFound(BTLEController btleController);
 
@@ -44,5 +44,7 @@ public interface NfcInitiatorHandler {
 	public abstract void nfcTagFound();
 
 	public abstract void btTagLost();
+
+	public abstract void protocolDone();
 
 }
