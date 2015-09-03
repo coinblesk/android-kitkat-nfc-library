@@ -133,7 +133,7 @@ public class BTResponderSetup {
 				NfcMessage output = responder.processIncomingData(input);
 				seq.set(output.sequenceNumber());
 				
-				if(output.isGetNextFragment()) {
+				/*if(output.isGetNextFragment()) {
 					server.sendResponse(device, requestId, BTInitiatorSetup.GET_NEXT_FRAGMENT, 0, new byte[0]);
 					if(Config.DEBUG) {
 						LOGGER.debug( "indicate fragment");
@@ -148,7 +148,7 @@ public class BTResponderSetup {
 					if(Config.DEBUG) {
 						LOGGER.debug( "indicate polling request");
 					}
-				} else {
+				} else*/ {
 					queue.offer(output.bytes());
 					server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, new byte[0]);
 					if(Config.DEBUG) {

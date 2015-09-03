@@ -308,7 +308,7 @@ public class BTInitiatorSetup {
 					LOGGER.debug( "characteristic request done: {}, {}, {}", status, BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH, BluetoothGatt.GATT_SUCCESS);
 				}
 				
-				if(status == GET_NEXT_FRAGMENT) {
+				/*if(status == GET_NEXT_FRAGMENT) {
 					NfcMessage m = new NfcMessage(Type.FRAGMENT);
 					m.sequenceNumber(seq.get());
 					msg.offer(m.bytes());
@@ -320,7 +320,7 @@ public class BTInitiatorSetup {
 					NfcMessage m = new NfcMessage(Type.POLLING_REQUEST);
 					m.sequenceNumber(seq.get());
 					msg.offer(m.bytes());
-				} else {
+				} else*/ {
 					boolean retVal = gatt.readCharacteristic(carClassic);
 					LOGGER.debug( "read characteristic: {}", retVal);
 				}
