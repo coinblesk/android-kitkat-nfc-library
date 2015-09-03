@@ -36,6 +36,14 @@ public class BTUtils {
 		final BluetoothManager bluetoothManager =
 		        (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
 		BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+		
+		//On some devices this does not work
+		try {
+			bluetoothAdapter.getBluetoothLeScanner();
+		} catch (NoSuchMethodError e) {
+			return null;
+		} 
+		
 		// Ensures Bluetooth is available on the device and it is enabled. If not,
 		// displays a dialog requesting user permission to enable Bluetooth.
 		if(bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {

@@ -64,6 +64,10 @@ public class NfcMessageSplitter {
 		LOGGER.debug("Total length: {}, payloadlen: {}", len, payloadLength);
 		final ArrayList<NfcMessage> list = new ArrayList<NfcMessage>(fragments);
 		
+		if(fragments == 0) {
+			return list;
+		}
+		
 		if(fragments == 1) {
 			final NfcMessage nfcMessage = new NfcMessage(Type.SINGLE).payload(payload);
 			list.add(nfcMessage);

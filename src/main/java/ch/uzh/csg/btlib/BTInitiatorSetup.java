@@ -175,9 +175,15 @@ public class BTInitiatorSetup {
 			public void onConnectionStateChange(BluetoothGatt gatt, int status,
 					int newState) {
 				if (newState == BluetoothGatt.STATE_CONNECTED) {
+					if(Config.DEBUG) {
+						LOGGER.debug( "connected");
+					}
 					BTInitiatorSetup.this.gatt = gatt;
 					gatt.requestMtu(mtu.get());
 			    } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+			    	if(Config.DEBUG) {
+						LOGGER.debug( "disconnected");
+					}
 			    	initiatorHandler.btTagLost();
 			    	BTInitiatorSetup.this.gatt = null;
 			    }

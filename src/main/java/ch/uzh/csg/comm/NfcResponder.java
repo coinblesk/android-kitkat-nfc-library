@@ -3,6 +3,7 @@ package ch.uzh.csg.comm;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,12 +135,22 @@ public class NfcResponder {
 				reset();
 				return msg;
 			}
-			if (!check && repeat) {
+			if (!check && repeat && lastMessageSent!=null) {
 				if (Config.DEBUG) {
 					LOGGER.debug( "repeat last message {}", lastMessageSent);
 				}
 				lastMessageReceived = inputMessage;
-				return lastMessageSent;
+				//check if we need to fragment - happens on handover from BT to NFC
+				List<NfcMessage> list = messageSplitter.getFragments(lastMessageSent.payload());
+				if(list.size() <= 1) {
+					return lastMessageSent;
+				} else {
+					responseHandler.handleFailed("BT - NFC handover, need to reinitiate");
+					outputMessage = new NfcMessage(Type.ERROR);
+					NfcMessage msg = prepareWrite(outputMessage);
+					reset();
+					return msg;
+				}
 			}
 			try {
 				outputMessage = handleRequest(inputMessage);
