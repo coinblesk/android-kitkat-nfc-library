@@ -65,24 +65,23 @@ public class NfcMessage {
 	 * specification.
 	 */
 	
-//	  <aid-filter android:name="F0F00777FF5500" />
-//    <aid-filter android:name="F0F00777FF5536" />
-//    <aid-filter android:name="F0F00777FF55F5" />
-//    <aid-filter android:name="F0F00777FF5400" />
-//    <aid-filter android:name="F0F00777FF5436" />
-//    <aid-filter android:name="F0F00777FF54F5" />
+//	  <aid-filter android:name="F0F00777FF6500" />
+//    <aid-filter android:name="F0F00777FF6536" />
+//    <aid-filter android:name="F0F00777FF65F5" />
+//    <aid-filter android:name="F0F00777FF6400" />
+//    <aid-filter android:name="F0F00777FF6436" />
+//    <aid-filter android:name="F0F00777FF64F5" />
 	
 	public static final int HEADER_LENGTH = 1;
   
 	public static final byte[] CLA_INS_P1_P2 = { 0x00, (byte) 0xA4, 0x04, 0x00 };
-	public static final byte[] AID_COINBLESK_1 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x0 };
-	public static final byte[] AID_COINBLESK_2 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, 0x36 };
-	public static final byte[] AID_COINBLESK_3 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
+	public static final byte[] AID_COINBLESK_1 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x65, 0x0 };
+	public static final byte[] AID_COINBLESK_2 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x65, 0x36 };
+	public static final byte[] AID_COINBLESK_3 = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x65, (byte) 0xF5 };
 	//this one indicates that we are the first message. So reset the other side, regardless the message type
-	public static final byte AID_COINBLESK_FIRST = 0x54;
+	public static final byte AID_COINBLESK_FIRST = 0x64;
 	public static final int AID_COINBLESK_FIRST_POS = 10;
 	
-	public static final byte[] BTLE_INIT = { (byte) 0xF0, (byte) 0xF0, 0x07, 0x77, (byte) 0xFF, 0x55, (byte) 0xF5 };
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_1;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_2;
 	public static final byte[] CLA_INS_P1_P2_COINBLESK_3;
