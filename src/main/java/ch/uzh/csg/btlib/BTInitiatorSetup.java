@@ -47,9 +47,9 @@ public class BTInitiatorSetup {
 	//status that will not occur here are repurposed
 	//don't use permission or encryption, or the device will get bonded automatically:
 	//http://stackoverflow.com/questions/24645519/android-how-can-i-make-ble-device-to-paired-device-bonded
-	public static final int GET_NEXT_FRAGMENT = BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
-	public static final int POLLING_RESPONSE = BluetoothGatt.GATT_INVALID_OFFSET;
-	public static final int POLLING_REQUEST = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+	public static final int GET_NEXT_FRAGMENT = 0x50;//BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
+	public static final int POLLING_RESPONSE = 0x51;//BluetoothGatt.GATT_INVALID_OFFSET;
+	public static final int POLLING_REQUEST = 0x52;//BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
 	
 	public static final int INITIAL_SIZE = 517;
 	public static final int BT_OVERHEAD = 3;
