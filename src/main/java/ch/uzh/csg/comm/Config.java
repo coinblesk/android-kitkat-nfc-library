@@ -14,6 +14,6 @@ public class Config {
 	 * a release, this should always be false! Before you log something, check
 	 * if this flag is set to true.
 	 */
-	public static final boolean DEBUG = true;
+	public static final boolean DEBUG = false;
 
 }
