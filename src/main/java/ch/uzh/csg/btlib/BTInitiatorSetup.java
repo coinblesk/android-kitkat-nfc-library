@@ -59,6 +59,8 @@ public class BTInitiatorSetup {
     
     private BluetoothGatt gatt;
     
+    private boolean running = false;
+    
     public static BTInitiatorSetup init(final NfcInitiator initiator, 
     		final Activity activity,  BluetoothAdapter bluetoothAdapter) {
     	if(instance == null) {
@@ -83,7 +85,7 @@ public class BTInitiatorSetup {
 				}
 				initiator.setmaxTransceiveLength(mtu.get() - BT_OVERHEAD);
 				initiator.tagDiscoverHandler().tagDiscovered(nfcTransceiver, false, false);
-				
+				running = true;
 			}
 		});
 		
@@ -93,7 +95,16 @@ public class BTInitiatorSetup {
 		return gatt!=null;
 	}
 	
+	public void softClose() {
+		if(!running) {
+			return;
+		}
+		close();
+		running = false;
+	}
+	
 	public void close() {
+		
 		if(Config.DEBUG) {
 			LOGGER.debug( "try close device");
 		}
@@ -104,6 +115,7 @@ public class BTInitiatorSetup {
 			}
 			gatt=null;
 		}
+		running = false;
 	}
 	
 	
@@ -186,6 +198,7 @@ public class BTInitiatorSetup {
 					}
 			    	initiatorHandler.btTagLost();
 			    	BTInitiatorSetup.this.gatt = null;
+			    	running = false;
 			    }
 			}
 			

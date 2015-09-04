@@ -141,16 +141,15 @@ public class NfcResponder {
 				}
 				lastMessageReceived = inputMessage;
 				//check if we need to fragment - happens on handover from BT to NFC
-				List<NfcMessage> list = messageSplitter.getFragments(lastMessageSent.payload());
-				if(list.size() <= 1) {
-					return lastMessageSent;
-				} else {
-					responseHandler.handleFailed("BT - NFC handover, need to reinitiate");
-					outputMessage = new NfcMessage(Type.ERROR);
-					NfcMessage msg = prepareWrite(outputMessage);
-					reset();
-					return msg;
+				if(messageSplitter.needsSplit(lastMessageSent.payload())) {
+					List<NfcMessage> list = messageSplitter.getFragments(lastMessageSent.payload());
+					for(NfcMessage msg:list) {
+						messageQueue.offer(msg);
+					}
+					return messageQueue.poll();
 				}
+				return lastMessageSent;
+				
 			}
 			try {
 				outputMessage = handleRequest(inputMessage);

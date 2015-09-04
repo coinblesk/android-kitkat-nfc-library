@@ -1,6 +1,7 @@
 package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,9 +173,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 			maxLen = 53;
 		} else if(pid == 8730 && vid == 1839) {
 			/**
-			 * The ACR1251U can handle larger message, go for the same amount as the android devices
+			 * The ACR1251U can handle larger message, go for the same amount as the android devices, 245
 			 */
-			maxLen = 245;
+			maxLen = 53;
 		} else {
 			throw new NfcLibException("unknow device with pid "+pid+":"+vid);
 		}
@@ -258,6 +259,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 			final byte[] recvBuffer = new byte[maxLen];
 			final int length;
 			try {
+				if (Config.DEBUG) {
+					LOGGER.debug( "write bytes: "+Arrays.toString(input));
+				}
 				length = reader.transmit(0, input, input.length, recvBuffer, recvBuffer.length);
 			} catch (ReaderException e) {
 				if (Config.DEBUG) {
@@ -286,7 +290,9 @@ public class ACSNfcTransceiver implements NfcTrans {
 
 		@Override
 		public void close() {
-			System.err.println("do nothing");
+			if(Config.DEBUG) {
+				LOGGER.debug("do nothing");
+			}
 			
 		}
 	}

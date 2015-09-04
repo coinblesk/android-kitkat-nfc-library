@@ -1,6 +1,7 @@
 package ch.uzh.csg.nfclib;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,6 +125,9 @@ public class AndroidNfcTransceiver implements ReaderCallback, NfcTrans {
 				throw new IOException("The message length exceeds the maximum capacity of " + MAX_WRITE_LENGTH + " bytes.");
 			}
 			try {
+				if (Config.DEBUG) {
+					LOGGER.debug( "write bytes: "+Arrays.toString(input));
+				}
 				byte[] retVal = isoDep.transceive(input);
 				return retVal;
 			} catch (IOException | IllegalStateException e) {

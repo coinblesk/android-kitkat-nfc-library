@@ -24,8 +24,8 @@ public class NfcMessageSplitter {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(NfcMessageSplitter.class);
 	
-	private int payloadLength = Integer.MAX_VALUE;
-	private byte[] data = null;
+	private volatile int payloadLength = Integer.MAX_VALUE;
+	private volatile byte[] data = null;
 	
 	/**
 	 * Returns a new NfcMessageSplitter to handle the fragmentation and
@@ -123,6 +123,11 @@ public class NfcMessageSplitter {
 	 */
 	public byte[] data() {
 		return data;
+	}
+
+	public boolean needsSplit(byte[] payload) {
+		final int fragments = (payload.length + payloadLength - 1) / payloadLength;
+		return fragments > 1;
 	}
 	
 }

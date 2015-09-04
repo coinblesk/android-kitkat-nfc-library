@@ -42,13 +42,13 @@ public class NfcInitiator {
 					LOGGER.debug( "Tag detected!");
 				}
 				try {			
-					if (!initiating) {
+					/*if (!initiating) {
 						if (Config.DEBUG) {
 							LOGGER.debug( "Nothing to do shutdown 1!");
 						}
 						nfcTransceiver.close();
 						return;
-					}
+					}*/
 					boolean resume = false;
 					if(handshake) {
 						try {
@@ -133,7 +133,7 @@ public class NfcInitiator {
 					if(!continueNFC) {
 						initiating = false;
 						if(Config.DEBUG) {
-							LOGGER.debug( "loop done");
+							LOGGER.debug( "loop done1");
 						}
 						initiatorHandler.protocolDone();
 						return;
@@ -208,7 +208,7 @@ public class NfcInitiator {
 					} catch (NfcLibException e) {
 						initiating = false;
 						if (Config.DEBUG) {
-							LOGGER.debug( "loop done");
+							LOGGER.debug( "loop done2");
 						}
 						initiatorHandler.protocolDone();
 					}
@@ -263,11 +263,6 @@ public class NfcInitiator {
 	}
 
 	public void reset() {
-		try {
-			throw new RuntimeException("call stack");
-		} catch (RuntimeException e) {
-			e.printStackTrace();
-		}
 		if (Config.DEBUG) {
 			LOGGER.debug( "reset state");
 		}
