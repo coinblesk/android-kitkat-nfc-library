@@ -63,10 +63,7 @@ public class BTInitiatorSetup {
     
     public static BTInitiatorSetup init(final NfcInitiator initiator, 
     		final Activity activity,  BluetoothAdapter bluetoothAdapter) {
-    	if(instance == null) {
-    		instance = new BTInitiatorSetup(initiator, bluetoothAdapter);
-    	}
-    	return instance;
+    	return new BTInitiatorSetup(initiator, bluetoothAdapter);
     }
 	
 	private BTInitiatorSetup(final NfcInitiator initiator, BluetoothAdapter bluetoothAdapter) {
